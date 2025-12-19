@@ -1,0 +1,144 @@
+package polymarket
+
+import (
+	"fmt"
+	"math"
+	"math/big"
+	"strconv"
+	"strings"
+
+	"github.com/tidwall/gjson"
+)
+
+func IsTickSizeSmaller(a TickSize, b TickSize) bool {
+	a1, err := strconv.ParseFloat(string(a), 64)
+	if err != nil {
+		return false
+	}
+	b1, err := strconv.ParseFloat(string(b), 64)
+	if err != nil {
+		return false
+	}
+	return a1 < b1
+}
+
+func PriceValid(price float64, tickSize TickSize) bool {
+	tickSize1, err := strconv.ParseFloat(string(tickSize), 64)
+	if err != nil {
+		return false
+	}
+	return price >= tickSize1 && price <= 1-tickSize1
+}
+
+func ConvertTickSize(tickSize TickSize) float64 {
+	tickSize1, err := strconv.ParseFloat(string(tickSize), 64)
+	if err != nil {
+		return 0
+	}
+	return tickSize1
+}
+
+func RoundNormal(num float64, decimals int) float64 {
+	if DecimalPlaces(num) <= decimals {
+		return num
+	}
+	multiplier := math.Pow10(decimals)
+	return math.Round((num+math.SmallestNonzeroFloat64)*multiplier) / multiplier
+}
+
+func RoundDown(num float64, decimals int) float64 {
+	if DecimalPlaces(num) <= decimals {
+		return num
+	}
+	multiplier := math.Pow10(decimals)
+	return math.Floor(num*multiplier) / multiplier
+}
+
+func RoundUp(num float64, decimals int) float64 {
+	if DecimalPlaces(num) <= decimals {
+		return num
+	}
+	multiplier := math.Pow10(decimals)
+	return math.Ceil(num*multiplier) / multiplier
+}
+
+func DecimalPlaces(num float64) int {
+	// 先判断整数
+	if num == float64(int64(num)) {
+		return 0
+	}
+
+	// 转成字符串
+	s := strconv.FormatFloat(num, 'f', -1, 64)
+	parts := strings.Split(s, ".")
+	if len(parts) < 2 {
+		return 0
+	}
+
+	return len(parts[1])
+}
+
+func ParseUnits(amount string, decimals int) (*big.Int, error) {
+	parts := strings.SplitN(amount, ".", 2)
+	intPart := parts[0]
+
+	fracPart := ""
+	if len(parts) == 2 {
+		fracPart = parts[1]
+		if len(fracPart) > decimals {
+			fracPart = fracPart[:decimals] // 截断多余小数位
+		}
+	}
+
+	// 补齐小数位
+	for len(fracPart) < decimals {
+		fracPart += "0"
+	}
+
+	result := new(big.Int)
+	_, ok := result.SetString(intPart+fracPart, 10)
+	if !ok {
+		return nil, fmt.Errorf("invalid amount: %s", amount)
+	}
+
+	return result, nil
+}
+
+func FloatToString(num float64, maxDecimals int) string {
+	// 如果是整数，直接返回整数部分
+	if num == math.Trunc(num) {
+		return strconv.FormatInt(int64(num), 10)
+	}
+
+	// 默认使用 strconv.FormatFloat 精度 -1（尽量少但不丢信息）
+	s := strconv.FormatFloat(num, 'f', -1, 64)
+
+	// 如果指定了最大小数位，进行截断
+	if maxDecimals > 0 {
+		parts := strings.SplitN(s, ".", 2)
+		if len(parts) == 2 && len(parts[1]) > maxDecimals {
+			frac := parts[1][:maxDecimals]
+			// 去掉末尾多余的 0
+			frac = strings.TrimRight(frac, "0")
+			if frac == "" {
+				return parts[0]
+			}
+			return parts[0] + "." + frac
+		}
+	}
+
+	return s
+}
+
+func StringPtr(s string) *string {
+	return &s
+}
+
+func GetStringArray(obj *gjson.Result, path string) []string {
+	arr := obj.Get(path).Array()
+	res := make([]string, 0, len(arr))
+	for _, v := range arr {
+		res = append(res, v.String())
+	}
+	return res
+}
