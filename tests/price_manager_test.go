@@ -1,42 +1,19 @@
-package main
+package tests
 
 import (
 	"fmt"
 	"log"
+	"testing"
 	"time"
 
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 )
 
-// RoundTo15Minutes 将时间向下舍入到最近的15分钟边界，返回Unix时间戳（秒）
-func RoundTo15Minutes(date ...time.Time) int64 {
-	var d time.Time
-	if len(date) == 0 {
-		d = time.Now()
-	} else {
-		d = date[0]
-	}
-
-	minutes := d.Minute()
-	floored := (minutes / 15) * 15
-
-	rounded := time.Date(d.Year(), d.Month(), d.Day(), d.Hour(), floored, 0, 0, d.Location())
-	return rounded.Unix()
-}
-
-func ToTimestamp(dateStr string) (int64, error) {
-	t, err := time.Parse(time.RFC3339, dateStr)
-	if err != nil {
-		return 0, err
-	}
-	return t.UnixMilli(), nil
-}
-
-func main() {
-	polymarketClient := polymarket.NewClient("", polymarket.Config{})
+func TestPriceManager(t *testing.T) {
+	polymarketClient := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", polymarket.Config{})
 	for {
-		marketSlug := fmt.Sprintf("eth-updown-15m-%d", RoundTo15Minutes())
+		marketSlug := fmt.Sprintf("eth-updown-15m-%d", polymarket.RoundTo15Minutes())
 		log.Printf("https://gamma-api.polymarket.com/markets/slug/%s", marketSlug)
 
 		market, err := polymarketClient.FetchMarketBySlug(marketSlug)
@@ -45,7 +22,7 @@ func main() {
 			return
 		}
 
-		endData, err := ToTimestamp(market.Get("endDate").String())
+		endData, err := polymarket.ToTimestamp(market.Get("endDate").String())
 		if err != nil {
 			log.Fatal("ToTimestamp failed:", err)
 			return
@@ -58,9 +35,9 @@ func main() {
 		})
 
 		// 启动价格监听
-		pm := NewPriceManager()
+		pm := polymarket.NewPriceManager()
 		pm.SubscribeToMarket(tokenIds...)
-		pm.Subscribe(func(priceData *PriceData) {
+		pm.Subscribe(func(priceData *polymarket.PriceData) {
 			// log.Printf("book: %+v", priceData)
 			token0 := pm.GetCurrentPrice(tokenIds[0])
 			token1 := pm.GetCurrentPrice(tokenIds[1])

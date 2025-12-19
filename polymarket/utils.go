@@ -6,9 +6,34 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/tidwall/gjson"
 )
+
+func ToTimestamp(dateStr string) (int64, error) {
+	t, err := time.Parse(time.RFC3339, dateStr)
+	if err != nil {
+		return 0, err
+	}
+	return t.UnixMilli(), nil
+}
+
+// RoundTo15Minutes 将时间向下舍入到最近的15分钟边界，返回Unix时间戳（秒）
+func RoundTo15Minutes(date ...time.Time) int64 {
+	var d time.Time
+	if len(date) == 0 {
+		d = time.Now()
+	} else {
+		d = date[0]
+	}
+
+	minutes := d.Minute()
+	floored := (minutes / 15) * 15
+
+	rounded := time.Date(d.Year(), d.Month(), d.Day(), d.Hour(), floored, 0, 0, d.Location())
+	return rounded.Unix()
+}
 
 func IsTickSizeSmaller(a TickSize, b TickSize) bool {
 	a1, err := strconv.ParseFloat(string(a), 64)

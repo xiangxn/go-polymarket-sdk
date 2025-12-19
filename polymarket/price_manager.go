@@ -1,4 +1,4 @@
-package main
+package polymarket
 
 import (
 	"encoding/json"

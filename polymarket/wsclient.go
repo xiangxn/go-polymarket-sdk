@@ -1,4 +1,4 @@
-package main
+package polymarket
 
 import (
 	"log"
@@ -9,7 +9,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type EventHandler func(data interface{})
+type EventHandler func(data any)
 
 type WebSocketClient struct {
 	url  string
@@ -66,7 +66,7 @@ emit 触发事件
 @param event 事件名称
 @param data 事件数据
 */
-func (c *WebSocketClient) emit(event string, data interface{}) {
+func (c *WebSocketClient) emit(event string, data any) {
 	c.mu.RLock()
 	handlers := c.handlers[event]
 	c.mu.RUnlock()
