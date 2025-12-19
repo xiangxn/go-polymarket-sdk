@@ -14,15 +14,13 @@ import (
 )
 
 type PolymarketClient struct {
-	clobHost     string
-	http         *resty.Client
-	cfg          Config
-	signer       Signer
-	creds        *ApiKeyCreds
-	builderCreds *builderSDK.LocalSignerConfig
-	tickSizes    map[string]TickSize
-	feeRates     map[string]float64
-	negRisk      map[string]bool
+	clobHost  string
+	http      *resty.Client
+	cfg       Config
+	signer    Signer
+	tickSizes map[string]TickSize
+	feeRates  map[string]float64
+	negRisk   map[string]bool
 }
 
 func NewClient(signerKey string, cfg Config) *PolymarketClient {
@@ -40,15 +38,13 @@ func NewClient(signerKey string, cfg Config) *PolymarketClient {
 	}
 
 	return &PolymarketClient{
-		http:         client,
-		cfg:          cfg,
-		signer:       Signer{privateKey, crypto.PubkeyToAddress(privateKey.PublicKey)},
-		tickSizes:    make(map[string]TickSize),
-		feeRates:     make(map[string]float64),
-		negRisk:      make(map[string]bool),
-		clobHost:     "https://clob.polymarket.com",
-		creds:        cfg.CLOBCreds,
-		builderCreds: cfg.BuilderCreds,
+		http:      client,
+		cfg:       cfg,
+		signer:    Signer{privateKey, crypto.PubkeyToAddress(privateKey.PublicKey)},
+		tickSizes: make(map[string]TickSize),
+		feeRates:  make(map[string]float64),
+		negRisk:   make(map[string]bool),
+		clobHost:  "https://clob.polymarket.com",
 	}
 }
 
@@ -260,11 +256,11 @@ func (c *PolymarketClient) CreateOrder(userOrder UserOrder, options CreateOrderO
 
 func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderType, deferExec bool) (*gjson.Result, error) {
 	path := "/order"
-	if c.creds == nil {
+	if c.cfg.CLOBCreds == nil {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.clobHost, path)
-	orderPayload := OrderToDTO(order, c.creds.Key, orderType, deferExec)
+	orderPayload := OrderToDTO(order, c.cfg.CLOBCreds.Key, orderType, deferExec)
 
 	data, err := json.Marshal(orderPayload)
 	if err != nil {
@@ -277,10 +273,10 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.creds, l2HeaderArgs, nil)
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.CLOBCreds, l2HeaderArgs, nil)
 
-	if c.builderCreds != nil {
-		signer, err := builderSDK.NewLocalSigner(*c.builderCreds)
+	if c.cfg.BuilderCreds != nil {
+		signer, err := builderSDK.NewLocalSigner(*c.cfg.BuilderCreds)
 		if err != nil {
 			return nil, err
 		}
@@ -302,7 +298,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 
 func (c *PolymarketClient) CancelOrder(payload OrderPayload) (*gjson.Result, error) {
 	path := "/order"
-	if c.creds == nil {
+	if c.cfg.CLOBCreds == nil {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.clobHost, path)
@@ -317,20 +313,20 @@ func (c *PolymarketClient) CancelOrder(payload OrderPayload) (*gjson.Result, err
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.creds, l2HeaderArgs, nil)
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.CLOBCreds, l2HeaderArgs, nil)
 	return c.Del(url, nil, payload, headers)
 }
 
 func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*gjson.Result, error) {
 	path := "/orders"
-	if c.creds == nil {
+	if c.cfg.CLOBCreds == nil {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.clobHost, path)
 
 	var ordersPayload []PostOrderDTO
 	for _, arg := range args {
-		orderPayload := OrderToDTO(arg.Order, c.creds.Key, arg.OrderType, deferExec)
+		orderPayload := OrderToDTO(arg.Order, c.cfg.CLOBCreds.Key, arg.OrderType, deferExec)
 		ordersPayload = append(ordersPayload, orderPayload)
 	}
 
@@ -345,10 +341,10 @@ func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*g
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.creds, l2HeaderArgs, nil)
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.CLOBCreds, l2HeaderArgs, nil)
 
-	if c.builderCreds != nil {
-		signer, err := builderSDK.NewLocalSigner(*c.builderCreds)
+	if c.cfg.BuilderCreds != nil {
+		signer, err := builderSDK.NewLocalSigner(*c.cfg.BuilderCreds)
 		if err != nil {
 			return nil, err
 		}
@@ -369,7 +365,7 @@ func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*g
 }
 
 func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, error) {
-	if c.creds == nil {
+	if c.cfg.CLOBCreds == nil {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	path := "/orders"
@@ -386,12 +382,12 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.creds, l2HeaderArgs, nil)
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.CLOBCreds, l2HeaderArgs, nil)
 	return c.Del(url, nil, ordersHashes, headers)
 }
 
 func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage bool, nextCursor *string) ([]OpenOrder, error) {
-	if c.creds == nil {
+	if c.cfg.CLOBCreds == nil {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	path := "/data/orders"
@@ -401,7 +397,7 @@ func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage 
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.creds, l2HeaderArgs, nil)
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.CLOBCreds, l2HeaderArgs, nil)
 
 	var openOrders []OpenOrder
 	if nextCursor == nil {
