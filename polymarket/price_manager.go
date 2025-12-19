@@ -2,6 +2,7 @@ package polymarket
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -21,13 +22,15 @@ type PriceManager struct {
 	isConnecting      bool
 	subsTokens        []string
 	callbackIDCounter int
+	clobMarketWSSURL  string
 }
 
 // NewPriceManager 创建新的 PriceManager 实例
-func NewPriceManager() *PriceManager {
+func NewPriceManager(wsBaseUrl string) *PriceManager {
 	return &PriceManager{
-		callbacks:   make(map[int]PriceUpdateCallback),
-		tokensPrice: make(map[string]*PriceData),
+		callbacks:        make(map[int]PriceUpdateCallback),
+		tokensPrice:      make(map[string]*PriceData),
+		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 	}
 }
 
@@ -58,9 +61,9 @@ func (pm *PriceManager) Start() error {
 
 	pm.isConnecting = true
 
-	log.Printf("🔌 连接到 WebSocket: wss://ws-subscriptions-clob.polymarket.com/ws/market")
+	log.Printf("🔌 连接到 WebSocket: %s", pm.clobMarketWSSURL)
 
-	pm.ws = NewWebSocketClient("wss://ws-subscriptions-clob.polymarket.com/ws/market", 10*time.Second)
+	pm.ws = NewWebSocketClient(pm.clobMarketWSSURL, 10*time.Second)
 	pm.ws.On("open", func(_ any) {
 		log.Println("[PriceManager] ✅ WebSocket Connected")
 		pm.isConnecting = false

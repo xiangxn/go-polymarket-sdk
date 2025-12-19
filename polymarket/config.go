@@ -7,11 +7,20 @@ import (
 	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 )
 
-type Config struct {
-	SocksProxy   *string
-	Timeout      time.Duration
+type PolymarketConfig struct {
+	ClobBaseURL    string
+	ClobWSBaseSURL string
+	GammaBaseURL   string
+
 	CLOBCreds    *ApiKeyCreds
 	BuilderCreds *builderSDK.LocalSignerConfig
+}
+
+type Config struct {
+	HttpTimeout time.Duration
+	SocksProxy  string
+
+	Polymarket PolymarketConfig
 }
 
 const CollateralTokenDecimals = 6

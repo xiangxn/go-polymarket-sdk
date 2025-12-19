@@ -11,7 +11,7 @@ import (
 )
 
 func TestPriceManager(t *testing.T) {
-	polymarketClient := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", polymarket.Config{})
+	polymarketClient := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", polymarket.DefaultConfig())
 	for {
 		marketSlug := fmt.Sprintf("eth-updown-15m-%d", polymarket.RoundTo15Minutes())
 		log.Printf("https://gamma-api.polymarket.com/markets/slug/%s", marketSlug)
@@ -35,7 +35,7 @@ func TestPriceManager(t *testing.T) {
 		})
 
 		// 启动价格监听
-		pm := polymarket.NewPriceManager()
+		pm := polymarket.NewPriceManager("wss://ws-subscriptions-clob.polymarket.com")
 		pm.SubscribeToMarket(tokenIds...)
 		pm.Subscribe(func(priceData *polymarket.PriceData) {
 			// log.Printf("book: %+v", priceData)
