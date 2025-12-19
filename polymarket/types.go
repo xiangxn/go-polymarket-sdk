@@ -26,7 +26,7 @@ type RoundConfig struct {
 type CreateOrderOptions struct {
 	TickSize      TickSize
 	SignatureType model.SignatureType
-	chainID       *big.Int
+	ChainID       *big.Int
 	NegRisk       *bool
 	FunderAddress *string
 }

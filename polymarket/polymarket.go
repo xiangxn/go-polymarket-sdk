@@ -202,7 +202,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 }
 
 func (c *PolymarketClient) CreateOrder(userOrder UserOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
-	if options.chainID == nil {
+	if options.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
 	tickSize, err := c.ResolveTickSize(userOrder.TokenID, &options.TickSize)
@@ -234,7 +234,7 @@ func (c *PolymarketClient) CreateOrder(userOrder UserOrder, options CreateOrderO
 	} else {
 		nr = model.CTFExchange
 	}
-	builder := builder.NewExchangeOrderBuilderImpl(options.chainID, nil)
+	builder := builder.NewExchangeOrderBuilderImpl(options.ChainID, nil)
 
 	var maker string
 	if options.FunderAddress != nil {
