@@ -1,7 +1,9 @@
 package tests
 
 import (
+	"log"
 	"math/big"
+	"os"
 	"testing"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
@@ -12,7 +14,7 @@ func TestCreateOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	client := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", config)
 
-	order, err := client.CreateOrder(polymarket.UserOrder{
+	order, err := client.CreateOrder(&polymarket.UserOrder{
 		TokenID: "24762431047507049460785923962525415896557183202961867581065585559228045929655",
 		Price:   0.5,
 		Size:    1.0,
@@ -26,4 +28,81 @@ func TestCreateOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("order: %+v", order)
+}
+
+// 这个测试会真实下单，请务必慎重
+func TestPlaceOrder(t *testing.T) {
+	config := polymarket.DefaultConfig()
+	privateKey := os.Getenv("SIGNERKEY")
+	funderAddress := os.Getenv("FUNDERADDRESS")
+	tokenID := os.Getenv("TOKENID")
+
+	config.Polymarket.CLOBCreds = &polymarket.ApiKeyCreds{
+		Key:        os.Getenv("CLOB_API_KEY"),
+		Secret:     os.Getenv("CLOB_SECRET"),
+		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+	}
+
+	client := polymarket.NewClient(privateKey, config)
+
+	order, err := client.CreateOrder(&polymarket.UserOrder{
+		TokenID: tokenID,
+		Price:   0.2,
+		Size:    5.0,
+		Side:    model.BUY,
+	}, polymarket.CreateOrderOptions{
+		TickSize:      polymarket.TickSize001,
+		SignatureType: model.POLY_GNOSIS_SAFE,
+		ChainID:       big.NewInt(137),
+		FunderAddress: &funderAddress,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("order: %+v", order)
+
+	result, err := client.PostOrder(order, polymarket.GTC, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("result: %+v", result)
+}
+
+func TestCancelOrder(t *testing.T) {
+	config := polymarket.DefaultConfig()
+	privateKey := os.Getenv("SIGNERKEY")
+	orderID := os.Getenv("ORDERID")
+	config.Polymarket.CLOBCreds = &polymarket.ApiKeyCreds{
+		Key:        os.Getenv("CLOB_API_KEY"),
+		Secret:     os.Getenv("CLOB_SECRET"),
+		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+	}
+	client := polymarket.NewClient(privateKey, config)
+
+	log.Println("orderID: ", orderID)
+	result, err := client.CancelOrder(&polymarket.OrderPayload{OrderID: orderID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("result: %+v", result)
+}
+
+func TestCancelOrders(t *testing.T) {
+	config := polymarket.DefaultConfig()
+	privateKey := os.Getenv("SIGNERKEY")
+	orderID := os.Getenv("ORDERID")
+	config.Polymarket.CLOBCreds = &polymarket.ApiKeyCreds{
+		Key:        os.Getenv("CLOB_API_KEY"),
+		Secret:     os.Getenv("CLOB_SECRET"),
+		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+	}
+	client := polymarket.NewClient(privateKey, config)
+
+	log.Println("orderID: ", orderID)
+	result, err := client.CancelOrders([]string{orderID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("result: %+v", result)
 }

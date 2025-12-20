@@ -1,9 +1,13 @@
 package polymarket
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"maps"
+	"net/http"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	builderSDK "github.com/polymarket/go-builder-signing-sdk"
@@ -51,9 +55,9 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	if params != nil {
 		request.SetQueryParams(params)
 	}
-	if headers != nil {
-		request.SetHeaders(headers)
-	}
+	overloadHeaders(resty.MethodGet, headers)
+	request.SetHeaders(headers)
+	// request.SetDebug(true)
 	resp, err := request.Get(url)
 	if err != nil {
 		return nil, err
@@ -65,14 +69,31 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	return &result, nil
 }
 
+func overloadHeaders(method string, headers map[string]string) {
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	maps.Copy(headers, map[string]string{
+		"User-Agent":   "@polymarket/clob-client",
+		"Accept":       "*/*",
+		"Connection":   "keep-alive",
+		"Content-Type": "application/json",
+	})
+	if method == resty.MethodGet {
+		maps.Copy(headers, map[string]string{
+			"Accept-Encoding": "gzip",
+		})
+	}
+}
+
 func (c *PolymarketClient) Post(url string, body any, headers map[string]string) (*gjson.Result, error) {
 	request := c.http.R()
-	if headers != nil {
-		request.SetHeaders(headers)
-	}
 	if body != nil {
 		request.SetBody(body)
 	}
+	overloadHeaders(resty.MethodPost, headers)
+	request.SetHeaders(headers)
+	// request.SetDebug(true)
 	resp, err := request.Post(url)
 	if err != nil {
 		return nil, err
@@ -85,24 +106,64 @@ func (c *PolymarketClient) Post(url string, body any, headers map[string]string)
 }
 
 func (c *PolymarketClient) Del(url string, params map[string]string, body any, headers map[string]string) (*gjson.Result, error) {
-	request := c.http.R()
-	if params != nil {
-		request.SetQueryParams(params)
-	}
-	if headers != nil {
-		request.SetHeaders(headers)
-	}
+
+	var reqBody io.Reader
 	if body != nil {
-		request.SetBody(body)
+		bodyIsString := false
+		if _, ok := body.(string); ok {
+			bodyIsString = true
+		}
+		if bodyIsString {
+			reqBody = bytes.NewReader([]byte(body.(string)))
+		} else {
+			data, err := json.Marshal(body)
+			if err != nil {
+				return nil, err
+			}
+			reqBody = bytes.NewReader(data)
+		}
 	}
-	resp, err := request.Delete(url)
+
+	// 构建请求
+	req, err := http.NewRequest(http.MethodDelete, url, reqBody)
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode(), resp.String())
+
+	// query params
+	if params != nil {
+		q := req.URL.Query()
+		for k, v := range params {
+			q.Set(k, v)
+		}
+		req.URL.RawQuery = q.Encode()
 	}
-	result := gjson.ParseBytes(resp.Bytes())
+
+	// headers（先 overload 再 set）
+	overloadHeaders(http.MethodDelete, headers)
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
+
+	// 复用 resty 的底层 http.Client（非常关键）
+	client := c.http.Client()
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(respBytes))
+	}
+
+	result := gjson.ParseBytes(respBytes)
 	return &result, nil
 }
 
@@ -201,7 +262,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 	return marketFeeRateBps, nil
 }
 
-func (c *PolymarketClient) CreateOrder(userOrder UserOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
+func (c *PolymarketClient) CreateOrder(userOrder *UserOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
 	if options.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -246,7 +307,67 @@ func (c *PolymarketClient) CreateOrder(userOrder UserOrder, options CreateOrderO
 	if err != nil {
 		return nil, err
 	}
-	order, err := builder.BuildSignedOrder(c.signer.PrivateKey, &orderData, nr)
+	order, err := builder.BuildSignedOrder(c.signer.PrivateKey, orderData, nr)
+	if err != nil {
+		return nil, err
+	}
+	return order, nil
+}
+
+func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *UserMarketOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
+	if options.ChainID == nil {
+		return nil, fmt.Errorf("chainID cannot be empty")
+	}
+	tickSize, err := c.ResolveTickSize(userMarketOrder.TokenID, &options.TickSize) // 建议市场开始时就获取tickSize
+	if err != nil {
+		return nil, err
+	}
+	feeRateBps, err := c.ResolveFeeRateBps(userMarketOrder.TokenID, userMarketOrder.FeeRateBps) // 建议市场开始时就获取feeRateBps
+	if err != nil {
+		return nil, err
+	}
+	userMarketOrder.FeeRateBps = &feeRateBps
+
+	if userMarketOrder.Price == nil { // 尽量在外面计算价格
+		price, cErr := c.CalculateMarketPrice(userMarketOrder.TokenID, userMarketOrder.Side, userMarketOrder.Amount, userMarketOrder.OrderType)
+		if cErr != nil {
+			return nil, cErr
+		}
+		userMarketOrder.Price = &price
+	}
+
+	if !PriceValid(*userMarketOrder.Price, tickSize) {
+		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", *userMarketOrder.Price, tickSize, 1-ConvertTickSize(tickSize))
+	}
+
+	var negRisk bool
+	if options.NegRisk != nil {
+		negRisk = *options.NegRisk
+	} else {
+		negRisk, err = c.GetNegRisk(userMarketOrder.TokenID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var nr model.VerifyingContract
+	if negRisk {
+		nr = model.NegRiskCTFExchange
+	} else {
+		nr = model.CTFExchange
+	}
+
+	builder := builder.NewExchangeOrderBuilderImpl(options.ChainID, nil)
+	var maker string
+	if options.FunderAddress != nil {
+		maker = *options.FunderAddress
+	} else {
+		maker = c.signer.Address.String()
+	}
+	orderData, err := BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userMarketOrder, GetRoundConfig(options.TickSize))
+	if err != nil {
+		return nil, err
+	}
+	order, err := builder.BuildSignedOrder(c.signer.PrivateKey, orderData, nr)
 	if err != nil {
 		return nil, err
 	}
@@ -263,10 +384,10 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 
 	data, err := json.Marshal(orderPayload)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	body := string(data)
-
+	log.Printf("body: %s", body)
 	l2HeaderArgs := L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
@@ -292,20 +413,21 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 			maps.Copy(headers, builderHeaders)
 		}
 	}
-	return c.Post(url, orderPayload, headers)
+	return c.Post(url, body, headers)
 }
 
-func (c *PolymarketClient) CancelOrder(payload OrderPayload) (*gjson.Result, error) {
+func (c *PolymarketClient) CancelOrder(payload *OrderPayload) (*gjson.Result, error) {
 	path := "/order"
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
-	data, err := json.Marshal(payload)
+	data, err := json.Marshal(*payload)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	body := string(data)
+	log.Printf("body: %s", body)
 
 	l2HeaderArgs := L2HeaderArgs{
 		Method:      "DELETE",
@@ -313,7 +435,7 @@ func (c *PolymarketClient) CancelOrder(payload OrderPayload) (*gjson.Result, err
 		Body:        &body,
 	}
 	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
-	return c.Del(url, nil, payload, headers)
+	return c.Del(url, nil, body, headers)
 }
 
 func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*gjson.Result, error) {
@@ -331,7 +453,7 @@ func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*g
 
 	data, err := json.Marshal(ordersPayload)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	body := string(data)
 
@@ -360,7 +482,7 @@ func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*g
 			maps.Copy(headers, builderHeaders)
 		}
 	}
-	return c.Post(url, ordersPayload, headers)
+	return c.Post(url, body, headers)
 }
 
 func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, error) {
@@ -372,7 +494,7 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 
 	data, err := json.Marshal(ordersHashes)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	body := string(data)
 
@@ -382,7 +504,7 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 		Body:        &body,
 	}
 	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
-	return c.Del(url, nil, ordersHashes, headers)
+	return c.Del(url, nil, body, headers)
 }
 
 func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage bool, nextCursor *string) ([]OpenOrder, error) {
@@ -443,4 +565,146 @@ func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage 
 		}
 	}
 	return openOrders, nil
+}
+
+func (c *PolymarketClient) GetApiKeys() ([]string, error) {
+	if c.cfg.Polymarket.HasCLOBAuth() == false {
+		return nil, fmt.Errorf("creds cannot be empty")
+	}
+	path := "/auth/api-keys"
+	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
+
+	headerArgs := L2HeaderArgs{
+		Method:      "GET",
+		RequestPath: path,
+	}
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, headerArgs, nil)
+	result, err := c.Get(url, nil, headers)
+	if err != nil {
+		return nil, err
+	}
+	var apiKeys []string
+	for _, item := range result.Get("apiKeys").Array() {
+		apiKeys = append(apiKeys, item.Value().(string))
+	}
+	return apiKeys, nil
+}
+
+func (c *PolymarketClient) GetOrderBook(tokenID string) (*OrderBookSummary, error) {
+	url := fmt.Sprintf("%s/book", c.cfg.Polymarket.ClobBaseURL)
+	result, err := c.Get(url, map[string]string{"token_id": tokenID}, nil)
+	if err != nil {
+		return nil, err
+	}
+	orderBookSummary := &OrderBookSummary{
+		Market:       result.Get("market").String(),
+		AssetId:      result.Get("asset_id").String(),
+		Timestamp:    result.Get("timestamp").Uint(),
+		MinOrderSize: result.Get("min_order_size").String(),
+		TickSize:     result.Get("tick_size").String(),
+		NegRisk:      result.Get("neg_risk").Bool(),
+		Hash:         result.Get("hash").String(),
+	}
+	bids := result.Get("bids").Array()
+	for _, item := range bids {
+		orderBookSummary.Bids = append(orderBookSummary.Bids, Book{
+			Price: item.Get("price").Float(),
+			Size:  item.Get("size").Float(),
+		})
+	}
+	asks := result.Get("asks").Array()
+	for _, item := range asks {
+		orderBookSummary.Asks = append(orderBookSummary.Asks, Book{
+			Price: item.Get("price").Float(),
+			Size:  item.Get("size").Float(),
+		})
+	}
+	return orderBookSummary, nil
+}
+
+func (c *PolymarketClient) GetOrderBooks(params []BookParams) ([]OrderBookSummary, error) {
+	url := fmt.Sprintf("%s/books", c.cfg.Polymarket.ClobBaseURL)
+	data, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	body := string(data)
+	result, err := c.Post(url, body, nil)
+	if err != nil {
+		return nil, err
+	}
+	var orderBooks []OrderBookSummary
+	for _, item := range result.Array() {
+		orderBook := OrderBookSummary{
+			Market:       item.Get("market").String(),
+			AssetId:      item.Get("asset_id").String(),
+			Timestamp:    item.Get("timestamp").Uint(),
+			MinOrderSize: item.Get("min_order_size").String(),
+			TickSize:     item.Get("tick_size").String(),
+			NegRisk:      item.Get("neg_risk").Bool(),
+			Hash:         item.Get("hash").String(),
+		}
+		bids := item.Get("bids").Array()
+		for _, it := range bids {
+			orderBook.Bids = append(orderBook.Bids, Book{
+				Price: it.Get("price").Float(),
+				Size:  it.Get("size").Float(),
+			})
+		}
+		asks := item.Get("asks").Array()
+		for _, it := range asks {
+			orderBook.Asks = append(orderBook.Asks, Book{
+				Price: it.Get("price").Float(),
+				Size:  it.Get("size").Float(),
+			})
+		}
+		orderBooks = append(orderBooks, orderBook)
+	}
+	return orderBooks, nil
+}
+
+func (c *PolymarketClient) GetServerTime() (uint64, error) {
+	url := fmt.Sprintf("%s/time", c.cfg.Polymarket.ClobBaseURL)
+	result, err := c.Get(url, nil, nil)
+	if err != nil {
+		return 0, err
+	}
+	return result.Uint(), nil
+}
+
+func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side, amount float64, orderType MarketOrderType) (float64, error) {
+	book, err := c.GetOrderBook(tokenID)
+	if err != nil {
+		return 0, fmt.Errorf("no orderbook")
+	}
+	if side == model.BUY {
+		if book.Asks == nil {
+			return 0, fmt.Errorf("no match")
+		}
+		return CalculateBuyMarketPrice(book.Asks, amount, orderType)
+	} else {
+		if book.Bids == nil {
+			return 0, fmt.Errorf("no match")
+		}
+		return CalculateSellMarketPrice(book.Bids, amount, orderType)
+	}
+}
+
+func (c *PolymarketClient) CancelMarketOrders(payload *OrderMarketCancelParams) (*gjson.Result, error) {
+	path := "/cancel-market-orders"
+	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
+
+	data, err := json.Marshal(*payload)
+	if err != nil {
+		return nil, err
+	}
+	body := string(data)
+
+	l2HeaderArgs := L2HeaderArgs{
+		Method:      "DELETE",
+		RequestPath: path,
+		Body:        &body,
+	}
+	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	return c.Del(url, nil, body, headers)
 }

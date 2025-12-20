@@ -19,16 +19,16 @@ func NewTickSize(v string) (TickSize, error) {
 	return ts, nil
 }
 
-func GetRoundConfig(t TickSize) RoundConfig {
+func GetRoundConfig(t TickSize) *RoundConfig {
 	switch t {
 	case TickSize01:
-		return RoundConfig{Price: 1, Size: 2, Amount: 3}
+		return &RoundConfig{Price: 1, Size: 2, Amount: 3}
 	case TickSize001:
-		return RoundConfig{Price: 2, Size: 2, Amount: 4}
+		return &RoundConfig{Price: 2, Size: 2, Amount: 4}
 	case TickSize0001:
-		return RoundConfig{Price: 3, Size: 2, Amount: 5}
+		return &RoundConfig{Price: 3, Size: 2, Amount: 5}
 	case TickSize00001:
-		return RoundConfig{Price: 4, Size: 2, Amount: 6}
+		return &RoundConfig{Price: 4, Size: 2, Amount: 6}
 	default:
 		panic("invalid TickSize: " + string(t))
 	}

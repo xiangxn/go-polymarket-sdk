@@ -74,6 +74,52 @@ type UserOrder struct {
 	Taker *string
 }
 
+type UserMarketOrder struct {
+	/**
+	 * TokenID of the Conditional token asset being traded
+	 */
+	TokenID string
+
+	/**
+	 * BUY orders: $$$ Amount to buy
+	 * SELL orders: Shares to sell
+	 */
+	Amount float64
+
+	/**
+	 * Side of the order
+	 */
+	Side model.Side
+
+	/**
+	 * Price used to create the order
+	 * If it is not present the market price will be used.
+	 */
+	Price *float64
+
+	/**
+	 * Fee rate, in basis points, charged to the order maker, charged on proceeds
+	 */
+	FeeRateBps *float64
+
+	/**
+	 * Nonce used for onchain cancellations
+	 */
+	Nonce *uint64
+
+	/**
+	 * Address of the order taker. The zero address is used to indicate a public order
+	 */
+	Taker *string
+
+	/**
+	 * Specifies the type of order execution:
+	 * - FOK (Fill or Kill): The order must be filled entirely or not at all.
+	 * - FAK (Fill and Kill): The order can be partially filled, and any unfilled portion is canceled.
+	 */
+	OrderType MarketOrderType
+}
+
 type ContractConfig struct {
 	Exchange          common.Address
 	NegRiskAdapter    common.Address
@@ -94,6 +140,13 @@ const (
 	FOK OrderType = "FOK"
 	GTD OrderType = "GTD"
 	FAK OrderType = "FAK"
+)
+
+type MarketOrderType string
+
+const (
+	MARKET_FOK MarketOrderType = "FOK"
+	MARKET_FAK MarketOrderType = "FAK"
 )
 
 type SideType string
@@ -130,6 +183,9 @@ type OrderDTO struct {
 	// Taker 数量，即接收的最小代币数量
 	TakerAmount string `json:"takerAmount"`
 
+	// 订单方向，买入或卖出, BUY or SELL
+	Side SideType `json:"side"`
+
 	// 订单过期的时间戳。
 	// 可选，如果未指定，则值为“0”（无过期时间）。
 	Expiration string `json:"expiration"`
@@ -140,9 +196,6 @@ type OrderDTO struct {
 	// 手续费率（以基点计），向委托人收取，按交易额计算
 	FeeRateBps string `json:"feeRateBps"`
 
-	// 订单方向，买入或卖出, BUY or SELL
-	Side SideType `json:"side"`
-
 	// 订单使用的签名类型。默认值为“EOA”。
 	SignatureType model.SignatureType `json:"signatureType"`
 
@@ -150,10 +203,10 @@ type OrderDTO struct {
 }
 
 type PostOrderDTO struct {
+	DeferExec bool      `json:"deferExec"`
 	Order     OrderDTO  `json:"order"`
 	Owner     string    `json:"owner"`
 	OrderType OrderType `json:"orderType"`
-	DeferExec bool      `json:"deferExec"`
 }
 
 type ApiKeyCreds struct {
@@ -178,6 +231,11 @@ type OpenOrderParams struct {
 	AssetId *string `json:"asset_id"`
 }
 
+type OrderMarketCancelParams struct {
+	Market  string `json:"market"`
+	AssetId string `json:"asset_id"`
+}
+
 type OpenOrder struct {
 	Id              string   `json:"id"`
 	Status          string   `json:"status"`
@@ -194,6 +252,23 @@ type OpenOrder struct {
 	CreatedAt       uint64   `json:"created_at"`
 	Expiration      string   `json:"expiration"`
 	OrderType       string   `json:"order_type"`
+}
+
+type OrderBookSummary struct {
+	Market       string `json:"market"`
+	AssetId      string `json:"asset_id"`
+	Timestamp    uint64 `json:"timestamp"`
+	Bids         []Book `json:"bids"`
+	Asks         []Book `json:"asks"`
+	MinOrderSize string `json:"min_order_size"`
+	TickSize     string `json:"tick_size"`
+	NegRisk      bool   `json:"neg_risk"`
+	Hash         string `json:"hash"`
+}
+
+type BookParams struct {
+	TokenId string   `json:"token_id"`
+	Side    SideType `json:"side"`
 }
 
 // ----------------------
