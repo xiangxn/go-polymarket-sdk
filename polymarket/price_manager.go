@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/tidwall/gjson"
+	"github.com/xiangxn/go-polymarket-sdk/orders"
 )
 
 // ----------------------
@@ -176,14 +177,14 @@ func (pm *PriceManager) handleMessage(msg string) {
 			return
 		}
 
-		bestBid := Book{Price: 0, Size: 0}
+		var bestBid orders.Book
 		if len(Bids) > 0 {
 			lastBid := Bids[len(Bids)-1]
 			bestBid.Price = lastBid.Get("price").Float()
 			bestBid.Size = lastBid.Get("size").Float()
 		}
 
-		bestAsk := Book{Price: 0, Size: 0}
+		var bestAsk orders.Book
 		if len(Asks) > 0 {
 			lastAsk := Asks[len(Asks)-1]
 			bestAsk.Price = lastAsk.Get("price").Float()
@@ -192,8 +193,8 @@ func (pm *PriceManager) handleMessage(msg string) {
 
 		priceData := &PriceData{
 			TokenID:   assetID,
-			BestAsk:   bestAsk,
-			BestBid:   bestBid,
+			BestAsk:   &bestAsk,
+			BestBid:   &bestBid,
 			Market:    market,
 			Timestamp: time.Now().UnixMilli(),
 		}

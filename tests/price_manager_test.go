@@ -8,13 +8,14 @@ import (
 
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
 func TestPriceManager(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	polymarketClient := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", config)
 	for {
-		marketSlug := fmt.Sprintf("eth-updown-15m-%d", polymarket.RoundTo15Minutes())
+		marketSlug := fmt.Sprintf("eth-updown-15m-%d", utils.RoundTo15Minutes())
 		log.Printf("%s/markets/slug/%s", config.Polymarket.GammaBaseURL, marketSlug)
 
 		market, err := polymarketClient.FetchMarketBySlug(marketSlug)
@@ -23,7 +24,7 @@ func TestPriceManager(t *testing.T) {
 			return
 		}
 
-		endData, err := polymarket.ToTimestamp(market.Get("endDate").String())
+		endData, err := utils.ToTimestamp(market.Get("endDate").String())
 		if err != nil {
 			log.Fatal("ToTimestamp failed:", err)
 			return

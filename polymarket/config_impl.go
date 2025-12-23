@@ -18,6 +18,7 @@ func DefaultConfig() *Config {
 			ClobBaseURL:    "https://clob.polymarket.com",
 			ClobWSBaseSURL: "wss://ws-subscriptions-clob.polymarket.com",
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
+			RelayerBaseURL: "https://relayer-v2.polymarket.com",
 			CLOBCreds:      nil,
 			BuilderCreds:   nil,
 		},

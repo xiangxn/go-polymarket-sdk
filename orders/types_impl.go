@@ -1,4 +1,4 @@
-package polymarket
+package orders
 
 import "fmt"
 

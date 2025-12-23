@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 )
 
@@ -31,10 +32,10 @@ func TestGetOrderBooks(t *testing.T) {
 
 	orderBooks, err := client.GetOrderBooks([]polymarket.BookParams{{
 		TokenId: tokenID,
-		Side:    polymarket.BUY,
+		Side:    orders.BUY,
 	}, {
 		TokenId: tokenID2,
-		Side:    polymarket.BUY,
+		Side:    orders.BUY,
 	}})
 	if err != nil {
 		t.Fatal(err)

@@ -5,14 +5,16 @@ import (
 	"time"
 
 	builderSDK "github.com/polymarket/go-builder-signing-sdk"
+	"github.com/xiangxn/go-polymarket-sdk/headers"
 )
 
 type PolymarketConfig struct {
 	ClobBaseURL    string
 	ClobWSBaseSURL string
 	GammaBaseURL   string
+	RelayerBaseURL string
 
-	CLOBCreds    *ApiKeyCreds
+	CLOBCreds    *headers.ApiKeyCreds
 	BuilderCreds *builderSDK.LocalSignerConfig
 }
 
@@ -22,5 +24,3 @@ type Config struct {
 
 	Polymarket PolymarketConfig
 }
-
-const CollateralTokenDecimals = 6

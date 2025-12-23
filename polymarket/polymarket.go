@@ -14,6 +14,9 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/builder"
 	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/tidwall/gjson"
+	"github.com/xiangxn/go-polymarket-sdk/headers"
+	"github.com/xiangxn/go-polymarket-sdk/orders"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 	"resty.dev/v3"
 )
 
@@ -21,7 +24,7 @@ type PolymarketClient struct {
 	http      *resty.Client
 	cfg       *Config
 	signer    Signer
-	tickSizes map[string]TickSize
+	tickSizes map[string]orders.TickSize
 	feeRates  map[string]float64
 	negRisk   map[string]bool
 }
@@ -44,7 +47,7 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 		http:      client,
 		cfg:       cfg,
 		signer:    Signer{privateKey, crypto.PubkeyToAddress(privateKey.PublicKey)},
-		tickSizes: make(map[string]TickSize),
+		tickSizes: make(map[string]orders.TickSize),
 		feeRates:  make(map[string]float64),
 		negRisk:   make(map[string]bool),
 	}
@@ -181,7 +184,7 @@ func (c *PolymarketClient) FetchMarketBySlug(slug string) (*gjson.Result, error)
 	return c.Get(url, nil, nil)
 }
 
-func (c *PolymarketClient) GetTickSize(tokenID string) (TickSize, error) {
+func (c *PolymarketClient) GetTickSize(tokenID string) (orders.TickSize, error) {
 	if tokenID == "" {
 		return "", fmt.Errorf("tokenID cannot be empty")
 	}
@@ -196,7 +199,7 @@ func (c *PolymarketClient) GetTickSize(tokenID string) (TickSize, error) {
 		return "", err
 	}
 
-	v, err = NewTickSize(result.Get("minimum_tick_size").String())
+	v, err = orders.NewTickSize(result.Get("minimum_tick_size").String())
 	if err != nil {
 		return "", err
 	}
@@ -237,13 +240,13 @@ func (c *PolymarketClient) GetNegRisk(tokenID string) (bool, error) {
 	return c.negRisk[tokenID], nil
 }
 
-func (c *PolymarketClient) ResolveTickSize(tokenID string, tickSize *TickSize) (TickSize, error) {
+func (c *PolymarketClient) ResolveTickSize(tokenID string, tickSize *orders.TickSize) (orders.TickSize, error) {
 	minTickSize, err := c.GetTickSize(tokenID)
 	if err != nil {
 		return "", err
 	}
 	if tickSize != nil {
-		if IsTickSizeSmaller(*tickSize, minTickSize) {
+		if orders.IsTickSizeSmaller(*tickSize, minTickSize) {
 			return "", fmt.Errorf("tickSize %s is smaller than minTickSize %s", *tickSize, minTickSize)
 		}
 		return *tickSize, nil
@@ -262,7 +265,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 	return marketFeeRateBps, nil
 }
 
-func (c *PolymarketClient) CreateOrder(userOrder *UserOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
+func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
 	if options.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -276,8 +279,8 @@ func (c *PolymarketClient) CreateOrder(userOrder *UserOrder, options CreateOrder
 	}
 	userOrder.FeeRateBps = &feeRateBps
 
-	if !PriceValid(userOrder.Price, tickSize) {
-		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", userOrder.Price, tickSize, 1-ConvertTickSize(tickSize))
+	if !orders.PriceValid(userOrder.Price, tickSize) {
+		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", userOrder.Price, tickSize, 1-orders.ConvertTickSize(tickSize))
 	}
 	var negRisk bool
 	if options.NegRisk != nil {
@@ -303,7 +306,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *UserOrder, options CreateOrder
 	} else {
 		maker = c.signer.Address.String()
 	}
-	orderData, err := BuildOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userOrder, GetRoundConfig(options.TickSize))
+	orderData, err := orders.BuildOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userOrder, orders.GetRoundConfig(options.TickSize))
 	if err != nil {
 		return nil, err
 	}
@@ -314,7 +317,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *UserOrder, options CreateOrder
 	return order, nil
 }
 
-func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *UserMarketOrder, options CreateOrderOptions) (*model.SignedOrder, error) {
+func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
 	if options.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -336,8 +339,8 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *UserMarketOrder, o
 		userMarketOrder.Price = &price
 	}
 
-	if !PriceValid(*userMarketOrder.Price, tickSize) {
-		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", *userMarketOrder.Price, tickSize, 1-ConvertTickSize(tickSize))
+	if !orders.PriceValid(*userMarketOrder.Price, tickSize) {
+		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", *userMarketOrder.Price, tickSize, 1-orders.ConvertTickSize(tickSize))
 	}
 
 	var negRisk bool
@@ -363,7 +366,7 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *UserMarketOrder, o
 	} else {
 		maker = c.signer.Address.String()
 	}
-	orderData, err := BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userMarketOrder, GetRoundConfig(options.TickSize))
+	orderData, err := orders.BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userMarketOrder, orders.GetRoundConfig(options.TickSize))
 	if err != nil {
 		return nil, err
 	}
@@ -374,13 +377,13 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *UserMarketOrder, o
 	return order, nil
 }
 
-func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderType, deferExec bool) (*gjson.Result, error) {
+func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.OrderType, deferExec bool) (*gjson.Result, error) {
 	path := "/order"
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
-	orderPayload := OrderToDTO(order, c.cfg.Polymarket.CLOBCreds.Key, orderType, deferExec)
+	orderPayload := orders.OrderToDTO(order, c.cfg.Polymarket.CLOBCreds.Key, orderType, deferExec)
 
 	data, err := json.Marshal(orderPayload)
 	if err != nil {
@@ -388,12 +391,12 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 	}
 	body := string(data)
 	log.Printf("body: %s", body)
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -416,7 +419,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType OrderTy
 	return c.Post(url, body, headers)
 }
 
-func (c *PolymarketClient) CancelOrder(payload *OrderPayload) (*gjson.Result, error) {
+func (c *PolymarketClient) CancelOrder(payload *orders.OrderPayload) (*gjson.Result, error) {
 	path := "/order"
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
@@ -429,25 +432,25 @@ func (c *PolymarketClient) CancelOrder(payload *OrderPayload) (*gjson.Result, er
 	body := string(data)
 	log.Printf("body: %s", body)
 
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
-func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*gjson.Result, error) {
+func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bool) (*gjson.Result, error) {
 	path := "/orders"
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
-	var ordersPayload []PostOrderDTO
+	var ordersPayload []orders.PostOrderDTO
 	for _, arg := range args {
-		orderPayload := OrderToDTO(arg.Order, c.cfg.Polymarket.CLOBCreds.Key, arg.OrderType, deferExec)
+		orderPayload := orders.OrderToDTO(arg.Order, c.cfg.Polymarket.CLOBCreds.Key, arg.OrderType, deferExec)
 		ordersPayload = append(ordersPayload, orderPayload)
 	}
 
@@ -457,12 +460,12 @@ func (c *PolymarketClient) PostOrders(args []PostOrdersArgs, deferExec bool) (*g
 	}
 	body := string(data)
 
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -498,31 +501,31 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 	}
 	body := string(data)
 
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
-func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage bool, nextCursor *string) ([]OpenOrder, error) {
+func (c *PolymarketClient) GetOpenOrders(params *orders.OpenOrderParams, onlyFirstPage bool, nextCursor *string) ([]orders.OpenOrder, error) {
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	path := "/data/orders"
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
-	var openOrders []OpenOrder
+	var openOrders []orders.OpenOrder
 	if nextCursor == nil {
-		nextCursor = StringPtr("MA==")
+		nextCursor = utils.StringPtr("MA==")
 	}
 	for *nextCursor != "LTE=" && (*nextCursor == "MA==" || !onlyFirstPage) {
 		pms := map[string]string{
@@ -543,9 +546,9 @@ func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage 
 		if err != nil {
 			return nil, err
 		}
-		nextCursor = StringPtr(result.Get("next_cursor").String())
+		nextCursor = utils.StringPtr(result.Get("next_cursor").String())
 		for _, item := range result.Get("data").Array() {
-			openOrders = append(openOrders, OpenOrder{
+			openOrders = append(openOrders, orders.OpenOrder{
 				Id:              item.Get("id").String(),
 				Status:          item.Get("status").String(),
 				Owner:           item.Get("owner").String(),
@@ -556,7 +559,7 @@ func (c *PolymarketClient) GetOpenOrders(params *OpenOrderParams, onlyFirstPage 
 				OriginalSize:    item.Get("original_size").String(),
 				SizeMatched:     item.Get("size_matched").String(),
 				Price:           item.Get("price").String(),
-				AssociateTrades: GetStringArray(&item, "associate_trades"),
+				AssociateTrades: utils.GetStringArray(&item, "associate_trades"),
 				Outcome:         item.Get("outcome").String(),
 				CreatedAt:       item.Get("created_at").Uint(),
 				Expiration:      item.Get("expiration").String(),
@@ -574,11 +577,11 @@ func (c *PolymarketClient) GetApiKeys() ([]string, error) {
 	path := "/auth/api-keys"
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
-	headerArgs := L2HeaderArgs{
+	headerArgs := headers.L2HeaderArgs{
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, headerArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &headerArgs, nil)
 	result, err := c.Get(url, nil, headers)
 	if err != nil {
 		return nil, err
@@ -607,14 +610,14 @@ func (c *PolymarketClient) GetOrderBook(tokenID string) (*OrderBookSummary, erro
 	}
 	bids := result.Get("bids").Array()
 	for _, item := range bids {
-		orderBookSummary.Bids = append(orderBookSummary.Bids, Book{
+		orderBookSummary.Bids = append(orderBookSummary.Bids, orders.Book{
 			Price: item.Get("price").Float(),
 			Size:  item.Get("size").Float(),
 		})
 	}
 	asks := result.Get("asks").Array()
 	for _, item := range asks {
-		orderBookSummary.Asks = append(orderBookSummary.Asks, Book{
+		orderBookSummary.Asks = append(orderBookSummary.Asks, orders.Book{
 			Price: item.Get("price").Float(),
 			Size:  item.Get("size").Float(),
 		})
@@ -646,14 +649,14 @@ func (c *PolymarketClient) GetOrderBooks(params []BookParams) ([]OrderBookSummar
 		}
 		bids := item.Get("bids").Array()
 		for _, it := range bids {
-			orderBook.Bids = append(orderBook.Bids, Book{
+			orderBook.Bids = append(orderBook.Bids, orders.Book{
 				Price: it.Get("price").Float(),
 				Size:  it.Get("size").Float(),
 			})
 		}
 		asks := item.Get("asks").Array()
 		for _, it := range asks {
-			orderBook.Asks = append(orderBook.Asks, Book{
+			orderBook.Asks = append(orderBook.Asks, orders.Book{
 				Price: it.Get("price").Float(),
 				Size:  it.Get("size").Float(),
 			})
@@ -672,7 +675,7 @@ func (c *PolymarketClient) GetServerTime() (uint64, error) {
 	return result.Uint(), nil
 }
 
-func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side, amount float64, orderType MarketOrderType) (float64, error) {
+func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side, amount float64, orderType orders.MarketOrderType) (float64, error) {
 	book, err := c.GetOrderBook(tokenID)
 	if err != nil {
 		return 0, fmt.Errorf("no orderbook")
@@ -681,16 +684,16 @@ func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side,
 		if book.Asks == nil {
 			return 0, fmt.Errorf("no match")
 		}
-		return CalculateBuyMarketPrice(book.Asks, amount, orderType)
+		return orders.CalculateBuyMarketPrice(book.Asks, amount, orderType)
 	} else {
 		if book.Bids == nil {
 			return 0, fmt.Errorf("no match")
 		}
-		return CalculateSellMarketPrice(book.Bids, amount, orderType)
+		return orders.CalculateSellMarketPrice(book.Bids, amount, orderType)
 	}
 }
 
-func (c *PolymarketClient) CancelMarketOrders(payload *OrderMarketCancelParams) (*gjson.Result, error) {
+func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelParams) (*gjson.Result, error) {
 	path := "/cancel-market-orders"
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
@@ -700,11 +703,11 @@ func (c *PolymarketClient) CancelMarketOrders(payload *OrderMarketCancelParams) 
 	}
 	body := string(data)
 
-	l2HeaderArgs := L2HeaderArgs{
+	l2HeaderArgs := headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, l2HeaderArgs, nil)
+	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }

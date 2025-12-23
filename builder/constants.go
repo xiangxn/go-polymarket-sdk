@@ -1,0 +1,28 @@
+package builder
+
+import "github.com/ethereum/go-ethereum/common"
+
+const (
+	SAFE_FACTORY         = "0xaacFeEa03eb1561C4e67d661e40682Bd20E3541b"
+	SAFE_MULTISEND       = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"
+	SAFE_INIT_CODE_HASH  = "0x2bce2127ff07fb632d16c8347c4ebf501f4841168bed00d9e6ef715ddb6fcecf"
+	PROXY_INIT_CODE_HASH = "0xd21df8dc65880a8606f09fe0ce3df9b8869287ab0b058be05aa9e8af6330a00b"
+)
+
+const (
+	CTF_ADDRESS          = "0x4d97dcd97ec945f40cf65f87097ace5ea0476045"
+	NEG_RISK_CTF_ADDRESS = "0xd91E80cF2E7be2e162c6513ceD06f1dD0dA35296"
+	USDC_ADDRESS         = "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+)
+
+const (
+	GET_NONCE          = "/nonce"
+	GET_RELAY_PAYLOAD  = "/relay-payload"
+	GET_DEPLOYED       = "/deployed"
+	SUBMIT_TRANSACTION = "/submit"
+)
+
+var (
+	ZeroAddress = common.HexToAddress("0x0000000000000000000000000000000000000000")
+	HashZero    = common.HexToHash("0x0000000000000000000000000000000000000000000000000000000000000000")
+)

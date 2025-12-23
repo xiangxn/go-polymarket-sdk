@@ -1,44 +1,40 @@
-package polymarket
+package orders
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"strconv"
-	"strings"
-	"time"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
+	"github.com/xiangxn/go-polymarket-sdk/constants"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
 func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfig *RoundConfig) (model.Side, float64, float64) {
-	rawPrice := RoundNormal(price, roundConfig.Price)
+	rawPrice := utils.RoundNormal(price, roundConfig.Price)
 
 	if side == model.BUY {
 		// force 2 decimals places
-		rawTakerAmt := RoundDown(size, roundConfig.Size)
+		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		rawMakerAmt := rawTakerAmt * rawPrice
-		if DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-			rawMakerAmt = RoundUp(rawMakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-				rawMakerAmt = RoundDown(rawMakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
+			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
+				rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
 			}
 		}
 
 		return model.BUY, rawMakerAmt, rawTakerAmt
 
 	} else {
-		rawMakerAmt := RoundDown(size, roundConfig.Size)
+		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		rawTakerAmt := rawMakerAmt * rawPrice
-		if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 			}
 		}
 
@@ -48,25 +44,25 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 
 func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, roundConfig *RoundConfig) (model.Side, float64, float64) {
 	// force 2 decimals places
-	rawPrice := RoundDown(price, roundConfig.Price)
+	rawPrice := utils.RoundDown(price, roundConfig.Price)
 
 	if side == model.BUY {
-		rawMakerAmt := RoundDown(amount, roundConfig.Size)
+		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt / rawPrice
-		if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 			}
 		}
 		return model.BUY, rawMakerAmt, rawTakerAmt
 	} else {
-		rawMakerAmt := RoundDown(amount, roundConfig.Size)
+		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt * rawPrice
-		if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 			}
 		}
 		return model.SELL, rawMakerAmt, rawTakerAmt
@@ -75,11 +71,11 @@ func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, ro
 
 func BuildOrderCreationArgs(signer string, maker string, signatureType model.SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*model.OrderData, error) {
 	side, rawMakerAmt, rawTakerAmt := GetOrderRawAmounts(userOrder.Side, userOrder.Size, userOrder.Price, roundConfig)
-	makerAmount, err := ParseUnits(FloatToString(rawMakerAmt, 0), CollateralTokenDecimals)
+	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
-	takerAmount, err := ParseUnits(FloatToString(rawTakerAmt, 0), CollateralTokenDecimals)
+	takerAmount, err := utils.ParseUnits(utils.FloatToString(rawTakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +87,7 @@ func BuildOrderCreationArgs(signer string, maker string, signatureType model.Sig
 	}
 	var feeRateBps string
 	if userOrder.FeeRateBps != nil {
-		feeRateBps = FloatToString(*userOrder.FeeRateBps, 0)
+		feeRateBps = utils.FloatToString(*userOrder.FeeRateBps, 0)
 	} else {
 		feeRateBps = "0"
 	}
@@ -130,11 +126,11 @@ func BuildMarketOrderCreationArgs(signer string, maker string, signatureType mod
 		inputPrice = 1
 	}
 	side, rawMakerAmt, rawTakerAmt := GetMarketOrderRawAmounts(userMarketOrder.Side, userMarketOrder.Amount, inputPrice, roundConfig)
-	makerAmount, err := ParseUnits(FloatToString(rawMakerAmt, 0), CollateralTokenDecimals)
+	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
-	takerAmount, err := ParseUnits(FloatToString(rawTakerAmt, 0), CollateralTokenDecimals)
+	takerAmount, err := utils.ParseUnits(utils.FloatToString(rawTakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +142,7 @@ func BuildMarketOrderCreationArgs(signer string, maker string, signatureType mod
 	}
 	var feeRateBps string
 	if userMarketOrder.FeeRateBps != nil {
-		feeRateBps = FloatToString(*userMarketOrder.FeeRateBps, 0)
+		feeRateBps = utils.FloatToString(*userMarketOrder.FeeRateBps, 0)
 	} else {
 		feeRateBps = "0"
 	}
@@ -197,65 +193,6 @@ func OrderToDTO(order *model.SignedOrder, owner string, orderType OrderType, def
 		},
 		Owner:     owner,
 		OrderType: orderType,
-	}
-}
-
-// BuildHmacSignature builds an HMAC signature
-// secret: base64 encoded secret key
-// timestamp: Unix timestamp
-// method: HTTP method (e.g., "POST", "GET")
-// requestPath: API endpoint path
-// body: Optional request body
-// Returns: URL-safe base64 encoded HMAC signature
-func GenSignature(
-	secret string,
-	timestamp int64,
-	method string,
-	requestPath string,
-	body *string,
-) string {
-	// Build the message: timestamp + method + path + body (if present)
-	message := strconv.FormatInt(timestamp, 10) + method + requestPath
-	if body != nil {
-		message += *body
-	}
-	log.Println("message: ", message)
-	// Decode the base64 secret
-	base64Secret, err := base64.StdEncoding.DecodeString(secret)
-	if err != nil {
-		// If decoding fails, treat secret as raw bytes
-		base64Secret = []byte(secret)
-	}
-	log.Println("base64Secret: ", base64Secret)
-
-	// Create HMAC-SHA256
-	h := hmac.New(sha256.New, base64Secret)
-	h.Write([]byte(message))
-	sig := h.Sum(nil)
-
-	// Encode to base64
-	sigBase64 := base64.StdEncoding.EncodeToString(sig)
-
-	// Convert to URL-safe base64: '+' -> '-', '/' -> '_'
-	// Keep '=' padding as is
-	sigURLSafe := strings.ReplaceAll(sigBase64, "+", "-")
-	sigURLSafe = strings.ReplaceAll(sigURLSafe, "/", "_")
-
-	return sigURLSafe
-}
-
-func CreateL2Headers(signer string, creds *ApiKeyCreds, l2HeaderArgs L2HeaderArgs, timestamp *int64) map[string]string {
-	if timestamp == nil {
-		now := time.Now().Unix()
-		timestamp = &now
-	}
-	signature := GenSignature(creds.Secret, *timestamp, l2HeaderArgs.Method, l2HeaderArgs.RequestPath, l2HeaderArgs.Body)
-	return map[string]string{
-		"POLY_ADDRESS":    signer,
-		"POLY_SIGNATURE":  signature,
-		"POLY_TIMESTAMP":  strconv.FormatInt(*timestamp, 10),
-		"POLY_API_KEY":    creds.Key,
-		"POLY_PASSPHRASE": creds.Passphrase,
 	}
 }
 
