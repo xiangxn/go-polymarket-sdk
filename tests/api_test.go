@@ -15,7 +15,7 @@ func TestGetApiKeys(t *testing.T) {
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
 	client := polymarket.NewClient(privateKey, config)

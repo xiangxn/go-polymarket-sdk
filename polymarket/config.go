@@ -13,6 +13,7 @@ type PolymarketConfig struct {
 	ClobWSBaseSURL string
 	GammaBaseURL   string
 	RelayerBaseURL string
+	DataAPIBaseURL string
 
 	CLOBCreds    *headers.ApiKeyCreds
 	BuilderCreds *builderSDK.LocalSignerConfig

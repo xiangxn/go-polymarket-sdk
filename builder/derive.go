@@ -36,6 +36,6 @@ func DeriveSafe(address common.Address, safeFactory common.Address) common.Addre
 	return GetCreate2Address(
 		safeFactory,
 		salt,
-		common.HexToHash(SAFE_INIT_CODE_HASH).Bytes(),
+		common.FromHex(SAFE_INIT_CODE_HASH),
 	)
 }

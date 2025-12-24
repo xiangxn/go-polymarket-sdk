@@ -14,7 +14,7 @@ import (
 	"github.com/polymarket/go-order-utils/pkg/builder"
 	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/tidwall/gjson"
-	"github.com/xiangxn/go-polymarket-sdk/headers"
+	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 	"resty.dev/v3"
@@ -58,7 +58,7 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	if params != nil {
 		request.SetQueryParams(params)
 	}
-	overloadHeaders(resty.MethodGet, headers)
+	Headers.OverloadHeaders(resty.MethodGet, headers)
 	request.SetHeaders(headers)
 	// request.SetDebug(true)
 	resp, err := request.Get(url)
@@ -72,31 +72,14 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	return &result, nil
 }
 
-func overloadHeaders(method string, headers map[string]string) {
-	if headers == nil {
-		headers = make(map[string]string)
-	}
-	maps.Copy(headers, map[string]string{
-		"User-Agent":   "@polymarket/clob-client",
-		"Accept":       "*/*",
-		"Connection":   "keep-alive",
-		"Content-Type": "application/json",
-	})
-	if method == resty.MethodGet {
-		maps.Copy(headers, map[string]string{
-			"Accept-Encoding": "gzip",
-		})
-	}
-}
-
 func (c *PolymarketClient) Post(url string, body any, headers map[string]string) (*gjson.Result, error) {
 	request := c.http.R()
 	if body != nil {
 		request.SetBody(body)
 	}
-	overloadHeaders(resty.MethodPost, headers)
+	Headers.OverloadHeaders(resty.MethodPost, headers)
 	request.SetHeaders(headers)
-	// request.SetDebug(true)
+	request.SetDebug(true)
 	resp, err := request.Post(url)
 	if err != nil {
 		return nil, err
@@ -143,7 +126,7 @@ func (c *PolymarketClient) Del(url string, params map[string]string, body any, h
 	}
 
 	// headers（先 overload 再 set）
-	overloadHeaders(http.MethodDelete, headers)
+	Headers.OverloadHeaders(http.MethodDelete, headers)
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
@@ -391,12 +374,12 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 	}
 	body := string(data)
 	log.Printf("body: %s", body)
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -432,12 +415,12 @@ func (c *PolymarketClient) CancelOrder(payload *orders.OrderPayload) (*gjson.Res
 	body := string(data)
 	log.Printf("body: %s", body)
 
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
@@ -460,12 +443,12 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 	}
 	body := string(data)
 
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -501,12 +484,12 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 	}
 	body := string(data)
 
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
@@ -517,11 +500,11 @@ func (c *PolymarketClient) GetOpenOrders(params *orders.OpenOrderParams, onlyFir
 	path := "/data/orders"
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	var openOrders []orders.OpenOrder
 	if nextCursor == nil {
@@ -577,11 +560,11 @@ func (c *PolymarketClient) GetApiKeys() ([]string, error) {
 	path := "/auth/api-keys"
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
 
-	headerArgs := headers.L2HeaderArgs{
+	headerArgs := Headers.L2HeaderArgs{
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &headerArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &headerArgs, nil)
 	result, err := c.Get(url, nil, headers)
 	if err != nil {
 		return nil, err
@@ -703,11 +686,30 @@ func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelP
 	}
 	body := string(data)
 
-	l2HeaderArgs := headers.L2HeaderArgs{
+	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "DELETE",
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
+}
+
+func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool) (*gjson.Result, error) {
+	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.DataAPIBaseURL, "/positions")
+	params := map[string]string{
+		"sizeThreshold": "0",
+		"limit":         "100",
+		"sortBy":        "TOKENS",
+		"sortDirection": "DESC",
+		"user":          proxyWallet,
+	}
+	if redeemable {
+		params["redeemable"] = "true"
+	}
+	result, err := c.Get(url, params, nil)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

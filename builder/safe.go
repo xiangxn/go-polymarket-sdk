@@ -2,13 +2,16 @@ package builder
 
 import (
 	"bytes"
+	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ivanzzeth/ethsig"
+	"github.com/ivanzzeth/ethsig/eip712"
 	pgc "github.com/ivanzzeth/polymarket-go-contracts"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
@@ -34,7 +37,7 @@ func BuildSafeTransactionRequest(
 	typedData := pgc.BuildSafeTransactionTypedData(args.ChainId, safeAddress, transaction.To, transaction.Value, transaction.Data, transaction.Operation, safeTxnGas, baseGas, gasPrice, gasToken, refundReceiver, args.Nonce)
 
 	eoaSigner := ethsig.NewEthPrivateKeySigner(signer.PrivateKey)
-	sig, err := eoaSigner.SignTypedData(typedData)
+	sig, err := SignTypedData(eoaSigner, typedData)
 
 	sigParams := SignatureParams{
 		GasPrice:       utils.StringPtr(gasPrice.String()),
@@ -51,9 +54,9 @@ func BuildSafeTransactionRequest(
 		From:            args.From.Hex(),
 		To:              transaction.To.Hex(),
 		ProxyWallet:     utils.StringPtr(safeAddress.Hex()),
-		Data:            string(transaction.Data),
+		Data:            "0x" + common.Bytes2Hex(transaction.Data),
 		Nonce:           utils.StringPtr(args.Nonce.String()),
-		Signature:       string(sig),
+		Signature:       "0x" + common.Bytes2Hex(sig),
 		SignatureParams: sigParams,
 		Type:            string(TT_SAFE),
 		Metadata:        metadata,
@@ -107,4 +110,42 @@ func CreateSafeMultisendTransaction(txns []SafeTransaction, safeMultisendAddress
 		Data:      data,
 		Operation: pgc.SafeOperationDelegateCall,
 	}, nil
+}
+
+func SignTypedData(signer *ethsig.EthPrivateKeySigner, typedData eip712.TypedData) ([]byte, error) {
+	domainSeparator, err := typedData.HashStruct("EIP712Domain", typedData.Domain.Map())
+	if err != nil {
+		return nil, ethsig.NewEIP712Error("failed to hash domain", err)
+	}
+	// fmt.Println("domainSeparator:", domainSeparator.String())
+	typedDataHash, err := typedData.HashStruct(typedData.PrimaryType, typedData.Message)
+	if err != nil {
+		return nil, ethsig.NewEIP712Error("failed to hash message", err)
+	}
+	// fmt.Println("typedDataHash:", typedDataHash.String())
+	// Create EIP-191 version 0x01 message
+	// rawData := []byte(fmt.Sprintf("\x19\x01%s%s", string(domainSeparator), string(typedDataHash)))
+	rawData := fmt.Appendf(nil, "\x19\x01%s%s", string(domainSeparator), string(typedDataHash))
+	digest := crypto.Keccak256Hash(rawData)
+	// fmt.Println("structHash:", digest.String())
+
+	signature, err := signer.PersonalSign(string(digest.Bytes()))
+	if err != nil {
+		return nil, ethsig.NewSignatureError("failed to sign", err)
+	}
+
+	last := signature[len(signature)-1]
+	v := int(last)
+
+	switch v {
+	case 0, 1:
+		signature[len(signature)-1] = last + 31
+	case 27, 28:
+		signature[len(signature)-1] = last + 4
+	default:
+		return nil, ethsig.NewSignatureError("invalid signature v value", nil)
+	}
+
+	// fmt.Println("signature:", common.Bytes2Hex(signature))
+	return signature, nil
 }

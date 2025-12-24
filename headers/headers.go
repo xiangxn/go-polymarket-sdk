@@ -1,10 +1,13 @@
 package headers
 
 import (
+	"maps"
 	"strconv"
 	"time"
 
+	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/xiangxn/go-polymarket-sdk/signature"
+	"resty.dev/v3"
 )
 
 func CreateL2Headers(signer string, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
@@ -28,7 +31,7 @@ func CreateL2Headers(signer string, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderAr
 	}
 }
 
-func CreateBuilderHeaders(builderCreds *ApiKeyCreds, method string, path string, body *string, timestamp *int64) map[string]string {
+func CreateBuilderHeaders(builderCreds *builderSDK.LocalSignerConfig, method string, path string, body *string, timestamp *int64) map[string]string {
 	if timestamp == nil {
 		now := time.Now().Unix()
 		timestamp = &now
@@ -42,5 +45,40 @@ func CreateBuilderHeaders(builderCreds *ApiKeyCreds, method string, path string,
 		"POLY_BUILDER_PASSPHRASE": builderCreds.Passphrase,
 		"POLY_BUILDER_SIGNATURE":  signature,
 		"POLY_BUILDER_TIMESTAMP":  strconv.FormatInt(*timestamp, 10),
+	}
+}
+
+func OverloadHeaders(method string, headers map[string]string) {
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	maps.Copy(headers, map[string]string{
+		"User-Agent":   "@polymarket/clob-client",
+		"Accept":       "*/*",
+		"Connection":   "keep-alive",
+		"Content-Type": "application/json",
+	})
+	if method == resty.MethodGet {
+		maps.Copy(headers, map[string]string{
+			"Accept-Encoding": "gzip",
+		})
+	}
+}
+
+func OverloadRelayHeaders(method string, headers map[string]string) {
+	if headers == nil {
+		headers = make(map[string]string)
+	}
+	maps.Copy(headers, map[string]string{
+		"User-Agent":                       "@polymarket/relay-client",
+		"Accept":                           "*/*",
+		"Connection":                       "keep-alive",
+		"Content-Type":                     "application/json",
+		"Access-Control-Allow-Credentials": "true",
+	})
+	if method == resty.MethodGet {
+		maps.Copy(headers, map[string]string{
+			"Accept-Encoding": "gzip",
+		})
 	}
 }

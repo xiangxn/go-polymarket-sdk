@@ -11,8 +11,10 @@ import (
 	pgc "github.com/ivanzzeth/polymarket-go-contracts"
 	ctokens "github.com/ivanzzeth/polymarket-go-contracts/contracts/conditional-tokens"
 	negriskadapter "github.com/ivanzzeth/polymarket-go-contracts/contracts/neg-risk-adapter"
+	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/headers"
+	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 	"resty.dev/v3"
 )
@@ -22,11 +24,11 @@ type RelayClient struct {
 	chainId            *big.Int
 	http               *resty.Client
 	signer             *polymarket.Signer
-	BuilderCreds       *headers.ApiKeyCreds
+	BuilderCreds       *builderSDK.LocalSignerConfig
 	safeContractConfig *SafeContractConfig
 }
 
-func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *headers.ApiKeyCreds, safeContractConfig *SafeContractConfig) *RelayClient {
+func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *builderSDK.LocalSignerConfig, safeContractConfig *SafeContractConfig) *RelayClient {
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
 		panic(err)
@@ -49,9 +51,9 @@ func (c *RelayClient) Get(url string, params map[string]string, headers map[stri
 	if params != nil {
 		request.SetQueryParams(params)
 	}
-	if headers != nil {
-		request.SetHeaders(headers)
-	}
+	Headers.OverloadRelayHeaders(resty.MethodPost, headers)
+	request.SetHeaders(headers)
+
 	// request.SetDebug(true)
 	resp, err := request.Get(url)
 	if err != nil {
@@ -68,11 +70,11 @@ func (c *RelayClient) Post(url string, body any, headers map[string]string) (*gj
 	if body != nil {
 		request.SetBody(body)
 	}
-	if headers != nil {
-		request.SetHeaders(headers)
-	}
+	Headers.OverloadRelayHeaders(resty.MethodPost, headers)
+	request.SetHeaders(headers)
 
 	// request.SetDebug(true)
+
 	resp, err := request.Post(url)
 	if err != nil {
 		return nil, err
@@ -136,6 +138,7 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata 
 
 	url := fmt.Sprintf("%s%s", c.relayerBaseURL, SUBMIT_TRANSACTION)
 	safe := c.GetExpectedSafe(c.signer.Address)
+	// log.Printf("safe: %s, signer: %s", safe.Hex(), c.signer.Address.Hex())
 	deployed, err := c.GetDeployed(safe)
 	if err != nil {
 		return nil, err
@@ -169,6 +172,7 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata 
 		return nil, err
 	}
 	body := string(requestPayload)
+	// log.Printf("body: %s", body)
 	var builderHeaders map[string]string
 	if c.BuilderCreds != nil {
 		builderHeaders = headers.CreateBuilderHeaders(c.BuilderCreds, resty.MethodPost, SUBMIT_TRANSACTION, &body, nil)
@@ -233,11 +237,16 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 			})
 		}
 	}
-	metadata, err := json.Marshal(metadatas)
-	if err != nil {
-		return nil, err
+
+	meta := "Redeem batch position"
+	if metadatas != nil {
+		metadata, err0 := json.Marshal(metadatas)
+		if err0 != nil {
+			return nil, err0
+		}
+		meta = string(metadata)
 	}
-	meta := string(metadata)
+
 	resp, err := c.EexecuteSafeTransactions(redeemTxs, &meta)
 	if err != nil {
 		return nil, err

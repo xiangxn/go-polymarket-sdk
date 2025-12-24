@@ -11,7 +11,10 @@ func GetCreate2Address(
 	salt [32]byte,
 	initCode []byte,
 ) common.Address {
-	initCodeHash := crypto.Keccak256(initCode)
+	initCodeHash := initCode
+	if len(initCode) > 32 {
+		initCodeHash = crypto.Keccak256(initCode)
+	}
 
 	data := []byte{0xff}
 	data = append(data, deployer.Bytes()...)

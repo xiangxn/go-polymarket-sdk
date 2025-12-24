@@ -60,12 +60,12 @@ func TestPlaceOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	privateKey := os.Getenv("SIGNERKEY")
 	funderAddress := os.Getenv("FUNDERADDRESS")
-	tokenID := os.Getenv("TOKENID")
+	tokenID := os.Getenv("TOKENID2")
 
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
 	client := polymarket.NewClient(privateKey, config)
@@ -101,7 +101,7 @@ func TestCancelOrder(t *testing.T) {
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 	client := polymarket.NewClient(privateKey, config)
 
@@ -120,7 +120,7 @@ func TestCancelOrders(t *testing.T) {
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 	client := polymarket.NewClient(privateKey, config)
 
@@ -137,7 +137,7 @@ func TestPlaceMarketOrder(t *testing.T) {
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
 	privateKey := os.Getenv("SIGNERKEY")
@@ -174,7 +174,7 @@ func TestGetOpenOrders(t *testing.T) {
 	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
-		Passphrase: os.Getenv("CLOB_PASS_PHRASE"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
 	privateKey := os.Getenv("SIGNERKEY")
