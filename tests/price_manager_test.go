@@ -3,6 +3,7 @@ package tests
 import (
 	"fmt"
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 
 func TestPriceManager(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	polymarketClient := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", config)
+	privateKey := os.Getenv("SIGNERKEY")
+	polymarketClient := polymarket.NewClient(privateKey, config)
 	for {
 		marketSlug := fmt.Sprintf("eth-updown-15m-%d", utils.RoundTo15Minutes())
 		log.Printf("%s/markets/slug/%s", config.Polymarket.GammaBaseURL, marketSlug)
