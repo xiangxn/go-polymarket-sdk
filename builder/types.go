@@ -7,20 +7,6 @@ import (
 	pgc "github.com/ivanzzeth/polymarket-go-contracts"
 )
 
-type RelayerTxType string
-
-const (
-	SAFE  RelayerTxType = "SAFE"
-	PROXY RelayerTxType = "PROXY"
-)
-
-type OperationType int
-
-const (
-	CALL OperationType = iota
-	DELEGATE_CALL
-)
-
 type SafeTransaction struct {
 	To        common.Address
 	Operation pgc.SafeOperation

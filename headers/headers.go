@@ -5,12 +5,13 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/xiangxn/go-polymarket-sdk/signature"
 	"resty.dev/v3"
 )
 
-func CreateL2Headers(signer string, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
+func CreateL2Headers(signer common.Address, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
 	if timestamp == nil {
 		now := time.Now().Unix()
 		timestamp = &now
@@ -23,7 +24,7 @@ func CreateL2Headers(signer string, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderAr
 	}
 	signature := signature.GenSignature(creds.Secret, *timestamp, l2HeaderArgs.Method, l2HeaderArgs.RequestPath, l2HeaderArgs.Body)
 	return map[string]string{
-		"POLY_ADDRESS":    signer,
+		"POLY_ADDRESS":    signer.Hex(),
 		"POLY_SIGNATURE":  signature,
 		"POLY_TIMESTAMP":  strconv.FormatInt(*timestamp, 10),
 		"POLY_API_KEY":    creds.Key,

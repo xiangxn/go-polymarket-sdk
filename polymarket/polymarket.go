@@ -379,7 +379,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -420,7 +420,7 @@ func (c *PolymarketClient) CancelOrder(payload *orders.OrderPayload) (*gjson.Res
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
@@ -448,7 +448,7 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
 		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
@@ -489,7 +489,7 @@ func (c *PolymarketClient) CancelOrders(ordersHashes []string) (*gjson.Result, e
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 
@@ -504,7 +504,7 @@ func (c *PolymarketClient) GetOpenOrders(params *orders.OpenOrderParams, onlyFir
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	var openOrders []orders.OpenOrder
 	if nextCursor == nil {
@@ -539,12 +539,12 @@ func (c *PolymarketClient) GetOpenOrders(params *orders.OpenOrderParams, onlyFir
 				Market:          item.Get("market").String(),
 				AssetId:         item.Get("asset_id").String(),
 				Side:            item.Get("side").String(),
-				OriginalSize:    item.Get("original_size").String(),
+				OriginalSize:    item.Get("original_size").Float(),
 				SizeMatched:     item.Get("size_matched").String(),
-				Price:           item.Get("price").String(),
+				Price:           item.Get("price").Float(),
 				AssociateTrades: utils.GetStringArray(&item, "associate_trades"),
 				Outcome:         item.Get("outcome").String(),
-				CreatedAt:       item.Get("created_at").Uint(),
+				CreatedAt:       item.Get("created_at").Int(),
 				Expiration:      item.Get("expiration").String(),
 				OrderType:       item.Get("order_type").String(),
 			})
@@ -564,7 +564,7 @@ func (c *PolymarketClient) GetApiKeys() ([]string, error) {
 		Method:      "GET",
 		RequestPath: path,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &headerArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &headerArgs, nil)
 	result, err := c.Get(url, nil, headers)
 	if err != nil {
 		return nil, err
@@ -691,7 +691,7 @@ func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelP
 		RequestPath: path,
 		Body:        &body,
 	}
-	headers := Headers.CreateL2Headers(c.signer.Address.Hex(), c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
+	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 	return c.Del(url, nil, body, headers)
 }
 

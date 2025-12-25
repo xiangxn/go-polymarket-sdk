@@ -217,12 +217,12 @@ type OpenOrder struct {
 	Market          string   `json:"market"`
 	AssetId         string   `json:"asset_id"`
 	Side            string   `json:"side"`
-	OriginalSize    string   `json:"original_size"`
+	OriginalSize    float64  `json:"original_size"`
 	SizeMatched     string   `json:"size_matched"`
-	Price           string   `json:"price"`
+	Price           float64  `json:"price"`
 	AssociateTrades []string `json:"associate_trades"`
 	Outcome         string   `json:"outcome"`
-	CreatedAt       uint64   `json:"created_at"`
+	CreatedAt       int64    `json:"created_at"`
 	Expiration      string   `json:"expiration"`
 	OrderType       string   `json:"order_type"`
 }
