@@ -1,12 +1,22 @@
 package polymarket
 
 import (
+	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+type WSEventType string
+
+const (
+	WSEventOpen      WSEventType = "open"
+	WSEventClose     WSEventType = "close"
+	WSEventError     WSEventType = "error"
+	WSEventReconnect WSEventType = "reconnect"
 )
 
 type EventHandler func(data any)
@@ -27,10 +37,6 @@ type WebSocketClient struct {
 	quit      chan struct{}
 	reconnect int32 // atomic
 	pingEvery time.Duration
-
-	// 订阅列表（重连恢复用）
-	subsMu        sync.RWMutex
-	subscriptions [][]byte
 }
 
 /*
@@ -40,13 +46,12 @@ NewWebSocketClient 创建客户端
 */
 func NewWebSocketClient(url string, pingEvery time.Duration) *WebSocketClient {
 	return &WebSocketClient{
-		url:           url,
-		handlers:      make(map[string][]EventHandler),
-		DataChan:      make(chan []byte, 4096),
-		quit:          make(chan struct{}),
-		reconnect:     1,
-		pingEvery:     pingEvery,
-		subscriptions: make([][]byte, 0),
+		url:       url,
+		handlers:  make(map[string][]EventHandler),
+		DataChan:  make(chan []byte, 4096),
+		quit:      make(chan struct{}),
+		reconnect: 1,
+		pingEvery: pingEvery,
 	}
 }
 
@@ -55,10 +60,10 @@ On 注册事件处理函数
 @param event 事件名称
 @param handler 事件处理函数
 */
-func (c *WebSocketClient) On(event string, handler EventHandler) {
+func (c *WebSocketClient) On(event WSEventType, handler EventHandler) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.handlers[event] = append(c.handlers[event], handler)
+	c.handlers[string(event)] = append(c.handlers[string(event)], handler)
 }
 
 /*
@@ -66,31 +71,13 @@ emit 触发事件
 @param event 事件名称
 @param data 事件数据
 */
-func (c *WebSocketClient) emit(event string, data any) {
+func (c *WebSocketClient) emit(event WSEventType, data any) {
 	c.mu.RLock()
-	handlers := c.handlers[event]
+	handlers := c.handlers[string(event)]
 	c.mu.RUnlock()
 
 	for _, h := range handlers {
 		go h(data)
-	}
-}
-
-/*
-AddSubscription 添加订阅
-@param msg 订阅消息
-*/
-func (c *WebSocketClient) AddSubscription(msg []byte) {
-	c.subsMu.Lock()
-	defer c.subsMu.Unlock()
-	c.subscriptions = append(c.subscriptions, msg)
-}
-
-func (c *WebSocketClient) restoreSubscriptions() {
-	c.subsMu.RLock()
-	defer c.subsMu.RUnlock()
-	for _, s := range c.subscriptions {
-		c.Send(s)
 	}
 }
 
@@ -103,7 +90,11 @@ func (c *WebSocketClient) connect() error {
 		return err
 	}
 	c.conn = conn
-	c.emit("open", nil)
+	c.conn.SetCloseHandler(func(code int, text string) error {
+		c.emit(WSEventClose, code)
+		return fmt.Errorf("ws close %s", text)
+	})
+	c.emit(WSEventOpen, nil)
 	return nil
 }
 
@@ -132,20 +123,32 @@ readLoop 读取消息循环
 */
 func (c *WebSocketClient) readLoop() {
 	for {
-		_, msg, err := c.conn.ReadMessage()
+		msgType, msg, err := c.conn.ReadMessage()
 		if err != nil {
-			c.emit("error", err)
-			c.emit("close", nil)
-
+			c.emit(WSEventError, err)
+			c.emit(WSEventClose, err)
 			if atomic.LoadInt32(&c.reconnect) == 1 {
 				c.reconnectLoop()
+				continue
+			} else {
+				return
 			}
-			return
+		}
+		if msgType == websocket.CloseMessage {
+			c.emit(WSEventClose, websocket.CloseMessage)
+			if atomic.LoadInt32(&c.reconnect) == 1 {
+				c.reconnectLoop()
+				continue
+			} else {
+				return
+			}
 		}
 
 		// 高频数据 → 数据通道
 		select {
 		case c.DataChan <- msg:
+		case <-c.quit:
+			return
 		default:
 			// channel 满了 → 丢掉 1 条旧消息
 			select {
@@ -167,18 +170,12 @@ func (c *WebSocketClient) reconnectLoop() {
 
 	for {
 		log.Println("[WS] Reconnecting...")
+		// 重连事件
+		c.emit(WSEventReconnect, nil)
 		err := c.connect()
 		if err == nil {
 			log.Println("[WS] Reconnected ✓")
-
-			// 重连事件
-			c.emit("reconnect", nil)
-
-			// 恢复订阅
-			c.restoreSubscriptions()
-
-			go c.readLoop()
-			return
+			break
 		}
 
 		log.Println("[WS] retry failed:", err)
@@ -193,15 +190,17 @@ func (c *WebSocketClient) reconnectLoop() {
 /*
 Start 启动客户端
 */
-func (c *WebSocketClient) Start() error {
+func (c *WebSocketClient) Start() {
 	if err := c.connect(); err != nil {
-		return err
+		c.emit(WSEventError, err)
+		if atomic.LoadInt32(&c.reconnect) == 1 {
+			c.reconnectLoop()
+		}
 	}
 
 	go c.readLoop()
 	c.startPing()
 	c.startMessageWorker()
-	return nil
 }
 
 /*
@@ -216,15 +215,6 @@ func (c *WebSocketClient) Send(msg []byte) error {
 		return websocket.ErrCloseSent
 	}
 	return c.conn.WriteMessage(websocket.TextMessage, msg)
-}
-
-/*
-Subscribe 订阅
-@param msg 订阅消息
-*/
-func (c *WebSocketClient) Subscribe(msg []byte) error {
-	c.AddSubscription(msg)
-	return c.Send(msg)
 }
 
 /*
@@ -247,9 +237,14 @@ func (c *WebSocketClient) OnMessage(handler func([]byte)) {
 
 func (c *WebSocketClient) startMessageWorker() {
 	go func() {
-		for msg := range c.DataChan {
-			if c.onMessage != nil {
-				c.onMessage(msg)
+		for {
+			select {
+			case msg := <-c.DataChan:
+				if c.onMessage != nil {
+					c.onMessage(msg)
+				}
+			case <-c.quit:
+				return
 			}
 		}
 	}()

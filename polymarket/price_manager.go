@@ -79,6 +79,10 @@ func (pm *PriceManager) Start() error {
 		log.Println("[PriceManager] WebSocket Error:", e)
 		pm.isConnecting = false
 	})
+	pm.ws.On("reconnect", func(_ any) {
+		// 清空数据，防止旧数据异常
+		pm.tokensPrice = make(map[string]*PriceData)
+	})
 
 	pm.ws.OnMessage(func(msg []byte) {
 		// log.Println("[PriceManager] WebSocket Message:", string(msg))
@@ -87,9 +91,7 @@ func (pm *PriceManager) Start() error {
 		}
 	})
 
-	if err := pm.ws.Start(); err != nil {
-		log.Fatal("[PriceManager] WebSocket start failed:", err)
-	}
+	pm.ws.Start()
 
 	return nil
 }
@@ -172,6 +174,7 @@ func (pm *PriceManager) handleMessage(msg string) {
 		Bids := gjson.Get(msg, "bids").Array()
 		Asks := gjson.Get(msg, "asks").Array()
 		assetID := gjson.Get(msg, "asset_id").String()
+		timestamp := gjson.Get(msg, "timestamp").Int()
 
 		if len(Bids) == 0 && len(Asks) == 0 {
 			return
@@ -196,7 +199,7 @@ func (pm *PriceManager) handleMessage(msg string) {
 			BestAsk:   &bestAsk,
 			BestBid:   &bestBid,
 			Market:    market,
-			Timestamp: time.Now().UnixMilli(),
+			Timestamp: timestamp,
 		}
 
 		pm.updatePrice(priceData)

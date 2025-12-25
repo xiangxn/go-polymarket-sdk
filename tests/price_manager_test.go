@@ -43,15 +43,16 @@ func TestPriceManager(t *testing.T) {
 		pm.SubscribeToMarket(tokenIds...)
 		pm.Subscribe(func(priceData *polymarket.PriceData) {
 			// log.Printf("book: %+v", priceData)
+			now := time.Now().UnixMilli()
 			token0 := pm.GetCurrentPrice(tokenIds[0])
 			token1 := pm.GetCurrentPrice(tokenIds[1])
 			if token0 == nil || token1 == nil || token0.BestAsk.Price == 0 || token1.BestAsk.Price == 0 {
 				return
 			}
 			if token0.BestAsk.Price+token1.BestAsk.Price < 1.0 {
-				log.Printf("Book Data === BestAsk: %.2f/%.2f=%.2f, %.2f/%.2f", token0.BestAsk.Price, token1.BestAsk.Price, token0.BestAsk.Price+token1.BestAsk.Price, token0.BestAsk.Size, token1.BestAsk.Size)
+				log.Printf("Book Data === BestAsk: %.2f/%.2f=%.2f, %.2f/%.2f, delay: %d", token0.BestAsk.Price, token1.BestAsk.Price, token0.BestAsk.Price+token1.BestAsk.Price, token0.BestAsk.Size, token1.BestAsk.Size, now-priceData.Timestamp)
 			}
-			if time.Now().UnixMilli()-endData > 1000 {
+			if now-endData > 1000 {
 				// 停止监听
 				pm.Disconnect()
 			}
