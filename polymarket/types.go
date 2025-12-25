@@ -27,7 +27,7 @@ type Signer struct {
 type OrderBookSummary struct {
 	Market       string        `json:"market"`
 	AssetId      string        `json:"asset_id"`
-	Timestamp    uint64        `json:"timestamp"`
+	Timestamp    int64         `json:"timestamp"`
 	Bids         []orders.Book `json:"bids"`
 	Asks         []orders.Book `json:"asks"`
 	MinOrderSize string        `json:"min_order_size"`

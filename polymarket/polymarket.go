@@ -585,7 +585,7 @@ func (c *PolymarketClient) GetOrderBook(tokenID string) (*OrderBookSummary, erro
 	orderBookSummary := &OrderBookSummary{
 		Market:       result.Get("market").String(),
 		AssetId:      result.Get("asset_id").String(),
-		Timestamp:    result.Get("timestamp").Uint(),
+		Timestamp:    result.Get("timestamp").Int(),
 		MinOrderSize: result.Get("min_order_size").String(),
 		TickSize:     result.Get("tick_size").String(),
 		NegRisk:      result.Get("neg_risk").Bool(),
@@ -624,7 +624,7 @@ func (c *PolymarketClient) GetOrderBooks(params []BookParams) ([]OrderBookSummar
 		orderBook := OrderBookSummary{
 			Market:       item.Get("market").String(),
 			AssetId:      item.Get("asset_id").String(),
-			Timestamp:    item.Get("timestamp").Uint(),
+			Timestamp:    item.Get("timestamp").Int(),
 			MinOrderSize: item.Get("min_order_size").String(),
 			TickSize:     item.Get("tick_size").String(),
 			NegRisk:      item.Get("neg_risk").Bool(),
@@ -649,13 +649,13 @@ func (c *PolymarketClient) GetOrderBooks(params []BookParams) ([]OrderBookSummar
 	return orderBooks, nil
 }
 
-func (c *PolymarketClient) GetServerTime() (uint64, error) {
+func (c *PolymarketClient) GetServerTime() (int64, error) {
 	url := fmt.Sprintf("%s/time", c.cfg.Polymarket.ClobBaseURL)
 	result, err := c.Get(url, nil, nil)
 	if err != nil {
 		return 0, err
 	}
-	return result.Uint(), nil
+	return result.Int(), nil
 }
 
 func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side, amount float64, orderType orders.MarketOrderType) (float64, error) {
