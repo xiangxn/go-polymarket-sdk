@@ -11,7 +11,6 @@ import (
 	pgc "github.com/ivanzzeth/polymarket-go-contracts"
 	ctokens "github.com/ivanzzeth/polymarket-go-contracts/contracts/conditional-tokens"
 	negriskadapter "github.com/ivanzzeth/polymarket-go-contracts/contracts/neg-risk-adapter"
-	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/headers"
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
@@ -24,11 +23,11 @@ type RelayClient struct {
 	chainId            *big.Int
 	http               *resty.Client
 	signer             *polymarket.Signer
-	BuilderCreds       *builderSDK.LocalSignerConfig
+	BuilderCreds       *headers.ApiKeyCreds
 	safeContractConfig *SafeContractConfig
 }
 
-func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *builderSDK.LocalSignerConfig, safeContractConfig *SafeContractConfig) *RelayClient {
+func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *headers.ApiKeyCreds, safeContractConfig *SafeContractConfig) *RelayClient {
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
 		panic(err)

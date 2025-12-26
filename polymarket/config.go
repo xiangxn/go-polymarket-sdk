@@ -4,19 +4,18 @@ package polymarket
 import (
 	"time"
 
-	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/xiangxn/go-polymarket-sdk/headers"
 )
 
 type PolymarketConfig struct {
-	ClobBaseURL    string
-	ClobWSBaseSURL string
-	GammaBaseURL   string
-	RelayerBaseURL string
-	DataAPIBaseURL string
+	ClobBaseURL    string `json:"clob_base_url"`
+	ClobWSBaseURL  string `json:"clob_ws_base_url"`
+	GammaBaseURL   string `json:"gamma_base_url"`
+	RelayerBaseURL string `json:"relayer_base_url"`
+	DataAPIBaseURL string `json:"data_api_base_url"`
 
-	CLOBCreds    *headers.ApiKeyCreds
-	BuilderCreds *builderSDK.LocalSignerConfig
+	CLOBCreds    *headers.ApiKeyCreds `json:"clob_creds"`
+	BuilderCreds *headers.ApiKeyCreds `json:"builder_creds"`
 }
 
 type Config struct {

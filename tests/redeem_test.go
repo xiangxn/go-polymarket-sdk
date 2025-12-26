@@ -5,16 +5,16 @@ import (
 	"os"
 	"testing"
 
-	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/xiangxn/go-polymarket-sdk/builder"
 	"github.com/xiangxn/go-polymarket-sdk/constants"
+	"github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
 func TestRedeem(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	config.Polymarket.BuilderCreds = &builderSDK.LocalSignerConfig{
+	config.Polymarket.BuilderCreds = &headers.ApiKeyCreds{
 		Key:        os.Getenv("BUILDER_API_KEY"),
 		Secret:     os.Getenv("BUILDER_SECRET"),
 		Passphrase: os.Getenv("BUILDER_PASSPHRASE"),

@@ -39,7 +39,7 @@ func TestPriceManager(t *testing.T) {
 		})
 
 		// 启动价格监听
-		pm := polymarket.NewPriceManager(config.Polymarket.ClobWSBaseSURL)
+		pm := polymarket.NewPriceManager(config.Polymarket.ClobWSBaseURL)
 		pm.SubscribeToMarket(tokenIds...)
 		pm.Subscribe(func(priceData *polymarket.PriceData) {
 			// log.Printf("book: %+v", priceData)

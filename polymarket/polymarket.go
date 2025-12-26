@@ -382,7 +382,11 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
-		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
+		signer, err := builderSDK.NewLocalSigner(builderSDK.LocalSignerConfig{
+			Key:        c.cfg.Polymarket.BuilderCreds.Key,
+			Secret:     c.cfg.Polymarket.BuilderCreds.Secret,
+			Passphrase: c.cfg.Polymarket.BuilderCreds.Passphrase,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -451,7 +455,11 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
-		signer, err := builderSDK.NewLocalSigner(*c.cfg.Polymarket.BuilderCreds)
+		signer, err := builderSDK.NewLocalSigner(builderSDK.LocalSignerConfig{
+			Key:        c.cfg.Polymarket.BuilderCreds.Key,
+			Secret:     c.cfg.Polymarket.BuilderCreds.Secret,
+			Passphrase: c.cfg.Polymarket.BuilderCreds.Passphrase,
+		})
 		if err != nil {
 			return nil, err
 		}
