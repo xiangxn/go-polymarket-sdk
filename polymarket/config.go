@@ -8,19 +8,19 @@ import (
 )
 
 type PolymarketConfig struct {
-	ClobBaseURL    string `json:"clob_base_url"`
-	ClobWSBaseURL  string `json:"clob_ws_base_url"`
-	GammaBaseURL   string `json:"gamma_base_url"`
-	RelayerBaseURL string `json:"relayer_base_url"`
-	DataAPIBaseURL string `json:"data_api_base_url"`
+	ClobBaseURL    string `mapstructure:"clob_base_url"`
+	ClobWSBaseURL  string `mapstructure:"clob_ws_base_url"`
+	GammaBaseURL   string `mapstructure:"gamma_base_url"`
+	RelayerBaseURL string `mapstructure:"relayer_base_url"`
+	DataAPIBaseURL string `mapstructure:"data_api_base_url"`
 
-	CLOBCreds    *headers.ApiKeyCreds `json:"clob_creds"`
-	BuilderCreds *headers.ApiKeyCreds `json:"builder_creds"`
+	CLOBCreds    *headers.ApiKeyCreds `mapstructure:"clob_creds"`
+	BuilderCreds *headers.ApiKeyCreds `mapstructure:"builder_creds"`
 }
 
 type Config struct {
-	HttpTimeout time.Duration `json:"http_timeout"`
-	SocksProxy  string        `json:"socks_proxy"`
+	HttpTimeout time.Duration `mapstructure:"http_timeout"`
+	SocksProxy  string        `mapstructure:"socks_proxy"`
 
-	Polymarket PolymarketConfig `json:"polymarket"`
+	Polymarket PolymarketConfig `mapstructure:"polymarket"`
 }
