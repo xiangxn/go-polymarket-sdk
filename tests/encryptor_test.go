@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/xiangxn/go-polymarket-sdk/polymarket"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
 func TestEncryptDecrypt(t *testing.T) {
-	enc := polymarket.NewEncryptor("my-strong-password")
+	enc := utils.NewEncryptor("my-strong-password")
 
 	cipherText, _ := enc.Encrypt("hello world")
 	plainText, _ := enc.Decrypt(cipherText)

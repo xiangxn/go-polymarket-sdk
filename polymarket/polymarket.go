@@ -10,7 +10,6 @@ import (
 	"net/http"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	builderSDK "github.com/polymarket/go-builder-signing-sdk"
 	"github.com/polymarket/go-order-utils/pkg/builder"
 	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/tidwall/gjson"
@@ -382,23 +381,8 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
-		signer, err := builderSDK.NewLocalSigner(builderSDK.LocalSignerConfig{
-			Key:        c.cfg.Polymarket.BuilderCreds.Key,
-			Secret:     c.cfg.Polymarket.BuilderCreds.Secret,
-			Passphrase: c.cfg.Polymarket.BuilderCreds.Passphrase,
-		})
-		if err != nil {
-			return nil, err
-		}
-		builderHeaders, err := signer.CreateHeaders(
-			"POST",
-			path,
-			&body,
-			nil,
-		)
-		if err != nil {
-			return nil, err
-		}
+		builderHeaders := Headers.CreateBuilderHeaders(c.cfg.Polymarket.BuilderCreds, resty.MethodPost, path, &body, nil)
+
 		if builderHeaders != nil {
 			maps.Copy(headers, builderHeaders)
 		}
@@ -455,23 +439,8 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
 	if c.cfg.Polymarket.HasBuilderAuth() {
-		signer, err := builderSDK.NewLocalSigner(builderSDK.LocalSignerConfig{
-			Key:        c.cfg.Polymarket.BuilderCreds.Key,
-			Secret:     c.cfg.Polymarket.BuilderCreds.Secret,
-			Passphrase: c.cfg.Polymarket.BuilderCreds.Passphrase,
-		})
-		if err != nil {
-			return nil, err
-		}
-		builderHeaders, err := signer.CreateHeaders(
-			"POST",
-			path,
-			&body,
-			nil,
-		)
-		if err != nil {
-			return nil, err
-		}
+		builderHeaders := Headers.CreateBuilderHeaders(c.cfg.Polymarket.BuilderCreds, resty.MethodPost, path, &body, nil)
+
 		if builderHeaders != nil {
 			maps.Copy(headers, builderHeaders)
 		}

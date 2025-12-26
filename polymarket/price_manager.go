@@ -9,6 +9,7 @@ import (
 
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
 // ----------------------
@@ -17,7 +18,7 @@ import (
 
 type PriceManager struct {
 	mu                sync.RWMutex
-	ws                *WebSocketClient
+	ws                *utils.WebSocketClient
 	callbacks         map[int]PriceUpdateCallback
 	tokensPrice       map[string]*PriceData
 	isConnecting      bool
@@ -64,7 +65,7 @@ func (pm *PriceManager) Start() error {
 
 	log.Printf("🔌 连接到 WebSocket: %s", pm.clobMarketWSSURL)
 
-	pm.ws = NewWebSocketClient(pm.clobMarketWSSURL, 10*time.Second)
+	pm.ws = utils.NewWebSocketClient(pm.clobMarketWSSURL, 10*time.Second)
 	pm.ws.On("open", func(_ any) {
 		log.Println("[PriceManager] ✅ WebSocket Connected")
 		pm.isConnecting = false
