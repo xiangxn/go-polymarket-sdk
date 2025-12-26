@@ -19,8 +19,8 @@ type PolymarketConfig struct {
 }
 
 type Config struct {
-	HttpTimeout time.Duration
-	SocksProxy  string
+	HttpTimeout time.Duration `json:"http_timeout"`
+	SocksProxy  string        `json:"socks_proxy"`
 
-	Polymarket PolymarketConfig
+	Polymarket PolymarketConfig `json:"polymarket"`
 }
