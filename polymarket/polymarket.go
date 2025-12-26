@@ -8,6 +8,7 @@ import (
 	"log"
 	"maps"
 	"net/http"
+	"sync"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/polymarket/go-order-utils/pkg/builder"
@@ -26,6 +27,10 @@ type PolymarketClient struct {
 	tickSizes map[string]orders.TickSize
 	feeRates  map[string]float64
 	negRisk   map[string]bool
+
+	muTickSizes sync.RWMutex
+	muFeeRates  sync.RWMutex
+	muNegRisk   sync.RWMutex
 }
 
 func NewClient(signerKey string, cfg *Config) *PolymarketClient {
@@ -50,6 +55,24 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 		feeRates:  make(map[string]float64),
 		negRisk:   make(map[string]bool),
 	}
+}
+
+func (c *PolymarketClient) ClearTickSizes() {
+	c.muTickSizes.Lock()
+	defer c.muTickSizes.Unlock()
+	c.tickSizes = make(map[string]orders.TickSize)
+}
+
+func (c *PolymarketClient) ClearFeeRates() {
+	c.muFeeRates.Lock()
+	defer c.muFeeRates.Unlock()
+	c.feeRates = make(map[string]float64)
+}
+
+func (c *PolymarketClient) ClearNegRisk() {
+	c.muNegRisk.Lock()
+	defer c.muNegRisk.Unlock()
+	c.negRisk = make(map[string]bool)
 }
 
 func (c *PolymarketClient) Get(url string, params map[string]string, headers map[string]string) (*gjson.Result, error) {
@@ -170,7 +193,9 @@ func (c *PolymarketClient) GetTickSize(tokenID string) (orders.TickSize, error) 
 	if tokenID == "" {
 		return "", fmt.Errorf("tokenID cannot be empty")
 	}
+	c.muTickSizes.RLock()
 	v, ok := c.tickSizes[tokenID]
+	c.muTickSizes.RUnlock()
 	if ok {
 		return v, nil
 	}
@@ -185,7 +210,9 @@ func (c *PolymarketClient) GetTickSize(tokenID string) (orders.TickSize, error) 
 	if err != nil {
 		return "", err
 	}
+	c.muTickSizes.Lock()
 	c.tickSizes[tokenID] = v
+	c.muTickSizes.Unlock()
 
 	return v, nil
 }
@@ -194,7 +221,9 @@ func (c *PolymarketClient) GetFeeRateBps(tokenID string) (float64, error) {
 	if tokenID == "" {
 		return 0, fmt.Errorf("tokenID cannot be empty")
 	}
+	c.muFeeRates.RLock()
 	v, ok := c.feeRates[tokenID]
+	c.muFeeRates.RUnlock()
 	if ok {
 		return v, nil
 	}
@@ -203,8 +232,9 @@ func (c *PolymarketClient) GetFeeRateBps(tokenID string) (float64, error) {
 	if err != nil {
 		return 0, err
 	}
-
+	c.muFeeRates.Lock()
 	c.feeRates[tokenID] = result.Get("base_fee").Float()
+	c.muFeeRates.Unlock()
 	return c.feeRates[tokenID], nil
 }
 
@@ -212,13 +242,21 @@ func (c *PolymarketClient) GetNegRisk(tokenID string) (bool, error) {
 	if tokenID == "" {
 		return false, fmt.Errorf("tokenID cannot be empty")
 	}
+	c.muNegRisk.RLock()
+	v, ok := c.negRisk[tokenID]
+	c.muNegRisk.RUnlock()
+	if ok {
+		return v, nil
+	}
 	url := fmt.Sprintf("%s/neg-risk", c.cfg.Polymarket.ClobBaseURL)
 	result, err := c.Get(url, map[string]string{"token_id": tokenID}, nil)
 	if err != nil {
 		return false, err
 	}
 
+	c.muNegRisk.Lock()
 	c.negRisk[tokenID] = result.Get("neg_risk").Bool()
+	c.muNegRisk.Unlock()
 	return c.negRisk[tokenID], nil
 }
 
