@@ -1,8 +1,6 @@
 package orders
 
 import (
-	"math/big"
-
 	"github.com/polymarket/go-order-utils/pkg/model"
 )
 
@@ -100,9 +98,7 @@ type RoundConfig struct {
 type CreateOrderOptions struct {
 	TickSize      TickSize
 	SignatureType model.SignatureType
-	ChainID       *big.Int
 	NegRisk       *bool
-	FunderAddress *string
 }
 
 // UserOrder Simplified order for users

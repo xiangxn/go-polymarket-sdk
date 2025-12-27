@@ -2,7 +2,6 @@ package tests
 
 import (
 	"log"
-	"math/big"
 	"os"
 	"testing"
 
@@ -24,7 +23,6 @@ func TestCreateOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      orders.TickSize001,
 		SignatureType: model.POLY_PROXY,
-		ChainID:       big.NewInt(137),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +45,6 @@ func TestCreateMarketOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      orders.TickSize001,
 		SignatureType: model.POLY_GNOSIS_SAFE,
-		ChainID:       big.NewInt(137),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -67,6 +64,7 @@ func TestPlaceOrder(t *testing.T) {
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
+	config.Polymarket.FunderAddress = &funderAddress
 
 	client := polymarket.NewClient(privateKey, config)
 
@@ -78,8 +76,6 @@ func TestPlaceOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      orders.TickSize001,
 		SignatureType: model.POLY_GNOSIS_SAFE,
-		ChainID:       big.NewInt(137),
-		FunderAddress: &funderAddress,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -139,11 +135,12 @@ func TestPlaceMarketOrder(t *testing.T) {
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
+	funderAddress := os.Getenv("FUNDERADDRESS")
+	config.Polymarket.FunderAddress = &funderAddress
 
 	privateKey := os.Getenv("SIGNERKEY")
 	client := polymarket.NewClient(privateKey, config)
 
-	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID")
 
 	order, err := client.CreateMarketOrder(&orders.UserMarketOrder{
@@ -154,8 +151,6 @@ func TestPlaceMarketOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      orders.TickSize001,
 		SignatureType: model.POLY_GNOSIS_SAFE,
-		ChainID:       big.NewInt(137),
-		FunderAddress: &funderAddress,
 	})
 	if err != nil {
 		t.Fatal(err)

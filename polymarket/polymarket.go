@@ -286,7 +286,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 }
 
 func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
-	if options.ChainID == nil {
+	if c.cfg.Polymarket.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
 	tickSize, err := c.ResolveTickSize(userOrder.TokenID, &options.TickSize)
@@ -318,11 +318,11 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	} else {
 		nr = model.CTFExchange
 	}
-	builder := builder.NewExchangeOrderBuilderImpl(options.ChainID, nil)
+	builder := builder.NewExchangeOrderBuilderImpl(c.cfg.Polymarket.ChainID, nil)
 
 	var maker string
-	if options.FunderAddress != nil {
-		maker = *options.FunderAddress
+	if c.cfg.Polymarket.FunderAddress != nil {
+		maker = *c.cfg.Polymarket.FunderAddress
 	} else {
 		maker = c.signer.Address.String()
 	}
@@ -338,7 +338,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 }
 
 func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
-	if options.ChainID == nil {
+	if c.cfg.Polymarket.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
 	tickSize, err := c.ResolveTickSize(userMarketOrder.TokenID, &options.TickSize) // 建议市场开始时就获取tickSize
@@ -379,10 +379,10 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 		nr = model.CTFExchange
 	}
 
-	builder := builder.NewExchangeOrderBuilderImpl(options.ChainID, nil)
+	builder := builder.NewExchangeOrderBuilderImpl(c.cfg.Polymarket.ChainID, nil)
 	var maker string
-	if options.FunderAddress != nil {
-		maker = *options.FunderAddress
+	if c.cfg.Polymarket.FunderAddress != nil {
+		maker = *c.cfg.Polymarket.FunderAddress
 	} else {
 		maker = c.signer.Address.String()
 	}
