@@ -1,6 +1,9 @@
 package polymarket
 
-import "time"
+import (
+	"math/big"
+	"time"
+)
 
 func (c *PolymarketConfig) HasCLOBAuth() bool {
 	return c.CLOBCreds != nil
@@ -15,6 +18,7 @@ func DefaultConfig() *Config {
 		HttpTimeout: 10 * time.Second,
 		SocksProxy:  "",
 		Polymarket: PolymarketConfig{
+			ChainID:        big.NewInt(137),
 			ClobBaseURL:    "https://clob.polymarket.com",
 			ClobWSBaseURL:  "wss://ws-subscriptions-clob.polymarket.com",
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
