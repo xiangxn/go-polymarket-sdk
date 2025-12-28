@@ -184,7 +184,7 @@ func (c *WebSocketClient) reconnectLoop() {
 
 		err := c.connect()
 		if err == nil {
-			log.Println("[WS] reconnected ✓")
+			log.Println("[WS] reconnected ✅")
 
 			c.connMu.RLock()
 			conn := c.conn
