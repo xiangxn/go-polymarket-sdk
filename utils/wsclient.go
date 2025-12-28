@@ -249,6 +249,19 @@ func (c *WebSocketClient) Close() {
 	c.alive.Store(false)
 }
 
+func (c *WebSocketClient) Reset() {
+	c.reconnectEnabled.Store(true)
+	c.connMu.Lock()
+	if c.conn != nil {
+		_ = c.conn.Close()
+	}
+	c.conn = nil
+	c.connMu.Unlock()
+
+	c.alive.Store(false)
+	c.reconnectLoop()
+}
+
 func (c *WebSocketClient) OnMessage(handler func([]byte)) {
 	c.onMessage = handler
 }
