@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"fmt"
 	"log"
 	"sync"
 	"sync/atomic"
@@ -22,163 +21,180 @@ const (
 type EventHandler func(data any)
 
 type WebSocketClient struct {
-	url  string
-	conn *websocket.Conn
+	url string
 
-	// 事件处理（open/close/error/reconnect）
-	handlers map[string][]EventHandler
-	mu       sync.RWMutex
+	connMu sync.RWMutex
+	conn   *websocket.Conn
 
-	// 数据通道（高频消息）
+	writeMu sync.Mutex // 串行化写入（gorilla 强制要求）
+
+	handlers   map[string][]EventHandler
+	handlersMu sync.RWMutex
+
 	DataChan  chan []byte
 	onMessage func([]byte)
 
-	// 重连控制
-	quit      chan struct{}
-	reconnect int32 // atomic
+	quit chan struct{}
+
+	reconnectEnabled atomic.Bool
+	alive            atomic.Bool
+
 	pingEvery time.Duration
 }
 
-/*
-NewWebSocketClient 创建客户端
-@param url 服务器地址
-@param pingEvery 心跳间隔
-*/
 func NewWebSocketClient(url string, pingEvery time.Duration) *WebSocketClient {
-	return &WebSocketClient{
+	c := &WebSocketClient{
 		url:       url,
 		handlers:  make(map[string][]EventHandler),
 		DataChan:  make(chan []byte, 4096),
 		quit:      make(chan struct{}),
-		reconnect: 1,
 		pingEvery: pingEvery,
 	}
+	c.reconnectEnabled.Store(true)
+	return c
 }
 
-/*
-On 注册事件处理函数
-@param event 事件名称
-@param handler 事件处理函数
-*/
 func (c *WebSocketClient) On(event WSEventType, handler EventHandler) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.handlersMu.Lock()
+	defer c.handlersMu.Unlock()
 	c.handlers[string(event)] = append(c.handlers[string(event)], handler)
 }
 
-/*
-emit 触发事件
-@param event 事件名称
-@param data 事件数据
-*/
 func (c *WebSocketClient) emit(event WSEventType, data any) {
-	c.mu.RLock()
-	handlers := c.handlers[string(event)]
-	c.mu.RUnlock()
+	c.handlersMu.RLock()
+	handlers := append([]EventHandler{}, c.handlers[string(event)]...)
+	c.handlersMu.RUnlock()
 
 	for _, h := range handlers {
-		go h(data)
+		go func(h EventHandler) {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Println("[WS] handler panic:", r)
+				}
+			}()
+			h(data)
+		}(h)
 	}
 }
 
-/*
-connect 连接服务器
-*/
 func (c *WebSocketClient) connect() error {
 	conn, _, err := websocket.DefaultDialer.Dial(c.url, nil)
 	if err != nil {
 		return err
 	}
+
+	c.connMu.Lock()
 	c.conn = conn
-	c.conn.SetCloseHandler(func(code int, text string) error {
-		c.emit(WSEventClose, code)
-		return fmt.Errorf("ws close %s", text)
+	c.connMu.Unlock()
+
+	// 标记存活
+	c.alive.Store(true)
+
+	// read deadline 初始设置
+	_ = conn.SetReadDeadline(time.Now().Add(2 * c.pingEvery))
+
+	// pong 刷新 deadline
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(2 * c.pingEvery))
 	})
+
+	// close handler -> 触发事件但不强行返回 error
+	conn.SetCloseHandler(func(code int, text string) error {
+		c.emit(WSEventClose, code)
+		return nil
+	})
+
 	c.emit(WSEventOpen, nil)
 	return nil
 }
 
-/*
-startPing 启动心跳
-*/
-func (c *WebSocketClient) startPing() {
+// ping loop 绑定当前 conn 生命周期
+func (c *WebSocketClient) startPing(conn *websocket.Conn) {
 	ticker := time.NewTicker(c.pingEvery)
+
 	go func() {
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ticker.C:
-				if c.conn != nil {
-					c.conn.WriteMessage(websocket.PingMessage, []byte("ping"))
+				c.writeMu.Lock()
+				err := conn.WriteMessage(websocket.PingMessage, nil)
+				c.writeMu.Unlock()
+
+				if err != nil {
+					return
 				}
 			case <-c.quit:
-				ticker.Stop()
 				return
 			}
 		}
 	}()
 }
 
-/*
-readLoop 读取消息循环
-*/
 func (c *WebSocketClient) readLoop() {
 	for {
-		msgType, msg, err := c.conn.ReadMessage()
-		if err != nil {
-			c.emit(WSEventError, err)
-			c.emit(WSEventClose, err)
-			if atomic.LoadInt32(&c.reconnect) == 1 {
-				c.reconnectLoop()
-				continue
-			} else {
-				return
-			}
-		}
-		if msgType == websocket.CloseMessage {
-			c.emit(WSEventClose, websocket.CloseMessage)
-			if atomic.LoadInt32(&c.reconnect) == 1 {
-				c.reconnectLoop()
-				continue
-			} else {
-				return
-			}
+		c.connMu.RLock()
+		conn := c.conn
+		c.connMu.RUnlock()
+
+		if conn == nil {
+			return
 		}
 
-		// 高频数据 → 数据通道
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			c.alive.Store(false)
+			c.emit(WSEventError, err)
+			c.emit(WSEventClose, err)
+
+			// 自动重连
+			if c.reconnectEnabled.Load() {
+				c.reconnectLoop()
+				continue
+			}
+			return
+		}
+
 		select {
 		case c.DataChan <- msg:
 		case <-c.quit:
 			return
 		default:
-			// channel 满了 → 丢掉 1 条旧消息
+			// 丢旧保新
 			select {
 			case <-c.DataChan:
-				// 忽略旧消息
 			default:
 			}
-			// 再写入最新消息
 			c.DataChan <- msg
 		}
 	}
 }
 
-/*
-reconnectLoop 重连循环
-*/
 func (c *WebSocketClient) reconnectLoop() {
 	delay := time.Second
 
 	for {
-		log.Println("[WS] Reconnecting...")
-		// 重连事件
-		c.emit(WSEventReconnect, nil)
-		err := c.connect()
-		if err == nil {
-			log.Println("[WS] Reconnected ✓")
-			break
+		if !c.reconnectEnabled.Load() {
+			return
 		}
 
-		log.Println("[WS] retry failed:", err)
+		log.Println("[WS] reconnecting...")
+		c.emit(WSEventReconnect, nil)
+
+		err := c.connect()
+		if err == nil {
+			log.Println("[WS] reconnected ✓")
+
+			c.connMu.RLock()
+			conn := c.conn
+			c.connMu.RUnlock()
+
+			c.startPing(conn)
+			return
+		}
+
+		log.Println("[WS] reconnect failed:", err)
 		time.Sleep(delay)
 
 		if delay < 30*time.Second {
@@ -187,48 +203,50 @@ func (c *WebSocketClient) reconnectLoop() {
 	}
 }
 
-/*
-Start 启动客户端
-*/
 func (c *WebSocketClient) Start() {
 	if err := c.connect(); err != nil {
 		c.emit(WSEventError, err)
-		if atomic.LoadInt32(&c.reconnect) == 1 {
+		if c.reconnectEnabled.Load() {
 			c.reconnectLoop()
 		}
 	}
 
+	c.connMu.RLock()
+	conn := c.conn
+	c.connMu.RUnlock()
+
+	c.startPing(conn)
 	go c.readLoop()
-	c.startPing()
 	c.startMessageWorker()
 }
 
-/*
-Send 发送消息
-@param msg 消息内容
-*/
 func (c *WebSocketClient) Send(msg []byte) error {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.connMu.RLock()
+	conn := c.conn
+	c.connMu.RUnlock()
 
-	if c.conn == nil {
+	if conn == nil {
 		return websocket.ErrCloseSent
 	}
-	return c.conn.WriteMessage(websocket.TextMessage, msg)
+
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
+	return conn.WriteMessage(websocket.TextMessage, msg)
 }
 
-/*
-Close 关闭客户端
-*/
 func (c *WebSocketClient) Close() {
-	atomic.StoreInt32(&c.reconnect, 0)
+	c.reconnectEnabled.Store(false)
 	close(c.quit)
 
-	c.mu.Lock()
+	c.connMu.Lock()
 	if c.conn != nil {
-		c.conn.Close()
+		_ = c.conn.Close()
 	}
-	c.mu.Unlock()
+	c.conn = nil
+	c.connMu.Unlock()
+
+	c.alive.Store(false)
 }
 
 func (c *WebSocketClient) OnMessage(handler func([]byte)) {
@@ -248,4 +266,8 @@ func (c *WebSocketClient) startMessageWorker() {
 			}
 		}
 	}()
+}
+
+func (c *WebSocketClient) IsAlive() bool {
+	return c.alive.Load()
 }
