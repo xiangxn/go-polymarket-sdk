@@ -250,7 +250,6 @@ func (c *WebSocketClient) Close() {
 }
 
 func (c *WebSocketClient) Reset() {
-	c.reconnectEnabled.Store(true)
 	c.connMu.Lock()
 	if c.conn != nil {
 		_ = c.conn.Close()
@@ -259,6 +258,7 @@ func (c *WebSocketClient) Reset() {
 	c.connMu.Unlock()
 
 	c.alive.Store(false)
+	c.reconnectEnabled.Store(true)
 	c.reconnectLoop()
 }
 
