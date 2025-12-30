@@ -289,7 +289,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	if c.cfg.Polymarket.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
-	tickSize, err := c.ResolveTickSize(userOrder.TokenID, &options.TickSize)
+	tickSize, err := c.ResolveTickSize(userOrder.TokenID, options.TickSize)
 	if err != nil {
 		return nil, err
 	}
@@ -326,7 +326,11 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	} else {
 		maker = c.signer.Address.String()
 	}
-	orderData, err := orders.BuildOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userOrder, orders.GetRoundConfig(options.TickSize))
+	signatureType := model.EOA
+	if options.SignatureType != nil {
+		signatureType = *options.SignatureType
+	}
+	orderData, err := orders.BuildOrderCreationArgs(c.signer.Address.String(), maker, signatureType, userOrder, orders.GetRoundConfig(tickSize))
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +345,7 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	if c.cfg.Polymarket.ChainID == nil {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
-	tickSize, err := c.ResolveTickSize(userMarketOrder.TokenID, &options.TickSize) // 建议市场开始时就获取tickSize
+	tickSize, err := c.ResolveTickSize(userMarketOrder.TokenID, options.TickSize) // 建议市场开始时就获取tickSize
 	if err != nil {
 		return nil, err
 	}
@@ -386,7 +390,11 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	} else {
 		maker = c.signer.Address.String()
 	}
-	orderData, err := orders.BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, options.SignatureType, userMarketOrder, orders.GetRoundConfig(options.TickSize))
+	signatureType := model.EOA
+	if options.SignatureType != nil {
+		signatureType = *options.SignatureType
+	}
+	orderData, err := orders.BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, signatureType, userMarketOrder, orders.GetRoundConfig(tickSize))
 	if err != nil {
 		return nil, err
 	}

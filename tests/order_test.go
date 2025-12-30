@@ -15,14 +15,16 @@ func TestCreateOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	client := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", config)
 
+	tickSize := orders.TickSize001
+	signatureType := model.POLY_PROXY
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: "24762431047507049460785923962525415896557183202961867581065585559228045929655",
 		Price:   0.5,
 		Size:    1.0,
 		Side:    model.BUY,
 	}, orders.CreateOrderOptions{
-		TickSize:      orders.TickSize001,
-		SignatureType: model.POLY_PROXY,
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -37,14 +39,16 @@ func TestCreateMarketOrder(t *testing.T) {
 
 	tokenID := os.Getenv("TOKENID")
 
+	tickSize := orders.TickSize001
+	signatureType := model.POLY_GNOSIS_SAFE
 	order, err := client.CreateMarketOrder(&orders.UserMarketOrder{
 		TokenID:   tokenID,
 		Amount:    1,
 		Side:      model.BUY,
 		OrderType: orders.MARKET_FOK,
 	}, orders.CreateOrderOptions{
-		TickSize:      orders.TickSize001,
-		SignatureType: model.POLY_GNOSIS_SAFE,
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -68,14 +72,16 @@ func TestPlaceOrder(t *testing.T) {
 
 	client := polymarket.NewClient(privateKey, config)
 
+	tickSize := orders.TickSize001
+	signatureType := model.POLY_GNOSIS_SAFE
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: tokenID,
 		Price:   0.2,
 		Size:    5.0,
 		Side:    model.BUY,
 	}, orders.CreateOrderOptions{
-		TickSize:      orders.TickSize001,
-		SignatureType: model.POLY_GNOSIS_SAFE,
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -143,14 +149,16 @@ func TestPlaceMarketOrder(t *testing.T) {
 
 	tokenID := os.Getenv("TOKENID")
 
+	tickSize := orders.TickSize001
+	signatureType := model.POLY_GNOSIS_SAFE
 	order, err := client.CreateMarketOrder(&orders.UserMarketOrder{
 		TokenID:   tokenID,
 		Amount:    1,
 		Side:      model.BUY,
 		OrderType: orders.MARKET_FOK,
 	}, orders.CreateOrderOptions{
-		TickSize:      orders.TickSize001,
-		SignatureType: model.POLY_GNOSIS_SAFE,
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
 	})
 	if err != nil {
 		t.Fatal(err)

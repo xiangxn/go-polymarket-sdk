@@ -96,8 +96,8 @@ type RoundConfig struct {
 }
 
 type CreateOrderOptions struct {
-	TickSize      TickSize
-	SignatureType model.SignatureType
+	TickSize      *TickSize
+	SignatureType *model.SignatureType
 	NegRisk       *bool
 }
 
