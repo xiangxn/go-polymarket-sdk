@@ -203,12 +203,9 @@ func (c *WebSocketClient) reconnectLoop() {
 	}
 }
 
-func (c *WebSocketClient) Start() {
+func (c *WebSocketClient) Start() error {
 	if err := c.connect(); err != nil {
-		c.emit(WSEventError, err)
-		// if c.reconnectEnabled.Load() {
-		// 	c.reconnectLoop()
-		// }
+		return err
 	}
 
 	c.connMu.RLock()
@@ -218,6 +215,7 @@ func (c *WebSocketClient) Start() {
 	c.startPing(conn)
 	go c.readLoop()
 	c.startMessageWorker()
+	return nil
 }
 
 func (c *WebSocketClient) Send(msg []byte) error {
