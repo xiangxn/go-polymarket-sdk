@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/big"
@@ -138,4 +139,16 @@ func GetStringArray(obj *gjson.Result, path string) []string {
 		res = append(res, v.String())
 	}
 	return res
+}
+
+func SleepWithCtx(ctx context.Context, d time.Duration) bool {
+	t := time.NewTimer(d)
+	defer t.Stop()
+
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
 }
