@@ -96,6 +96,68 @@ func TestPlaceOrder(t *testing.T) {
 	t.Logf("result: %+v", result)
 }
 
+func TestPlaceOrders(t *testing.T) {
+	config := polymarket.DefaultConfig()
+	privateKey := os.Getenv("SIGNERKEY")
+	funderAddress := os.Getenv("FUNDERADDRESS")
+	tokenID := os.Getenv("TOKENID2")
+
+	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+		Key:        os.Getenv("CLOB_API_KEY"),
+		Secret:     os.Getenv("CLOB_SECRET"),
+		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
+	}
+	config.Polymarket.FunderAddress = &funderAddress
+
+	client := polymarket.NewClient(privateKey, config)
+
+	tickSize := orders.TickSize001
+	signatureType := model.POLY_GNOSIS_SAFE
+	order, err := client.CreateOrder(&orders.UserOrder{
+		TokenID: tokenID,
+		Price:   0.2,
+		Size:    5.0,
+		Side:    model.BUY,
+	}, orders.CreateOrderOptions{
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("order: %+v", order)
+
+	order2, err := client.CreateOrder(&orders.UserOrder{
+		TokenID: tokenID,
+		Price:   0.2,
+		Size:    5.0,
+		Side:    model.BUY,
+	}, orders.CreateOrderOptions{
+		TickSize:      &tickSize,
+		SignatureType: &signatureType,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("order2: %+v", order)
+
+	var os []orders.PostOrdersArgs
+	os = append(os, orders.PostOrdersArgs{
+		Order:     order,
+		OrderType: orders.GTC,
+	})
+	os = append(os, orders.PostOrdersArgs{
+		Order:     order2,
+		OrderType: orders.GTC,
+	})
+	result, err := client.PostOrders(os, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("result: %+v", result)
+}
+
 func TestCancelOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	privateKey := os.Getenv("SIGNERKEY")
