@@ -10,6 +10,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+var ErrMsgOverflow = errors.New("ws message channel overflow")
+
+type WSHandler interface {
+	OnOpen()
+	OnReconnect()
+	OnError(err error)
+	OnClose()
+}
+
 type WSClient interface {
 	Run(ctx context.Context) error
 	Send(msg []byte) error
@@ -34,7 +43,8 @@ type WSConfig struct {
 }
 
 type wsClient struct {
-	cfg WSConfig
+	cfg     WSConfig
+	handler WSHandler
 
 	conn   *websocket.Conn
 	dialer *websocket.Dialer
@@ -46,12 +56,12 @@ type wsClient struct {
 	mu    sync.Mutex
 }
 
-func NewWSClient(cfg WSConfig) WSClient {
+func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 	if cfg.MsgBufferSize == 0 {
 		cfg.MsgBufferSize = 1024
 	}
 	if cfg.PingInterval == 0 {
-		cfg.PingInterval = 10 * time.Second
+		cfg.PingInterval = 15 * time.Second
 	}
 	if cfg.PongWait == 0 {
 		cfg.PongWait = 30 * time.Second
@@ -61,17 +71,20 @@ func NewWSClient(cfg WSConfig) WSClient {
 	}
 
 	return &wsClient{
-		cfg:   cfg,
-		msgCh: make(chan []byte, cfg.MsgBufferSize),
+		cfg:     cfg,
+		handler: handler,
+		msgCh:   make(chan []byte, cfg.MsgBufferSize),
 	}
 }
 
 func (c *wsClient) Run(ctx context.Context) error {
 	retry := 0
+	first := true
 
 	for {
 		select {
 		case <-ctx.Done():
+			c.callOnClose()
 			return ctx.Err()
 		default:
 		}
@@ -82,6 +95,7 @@ func (c *wsClient) Run(ctx context.Context) error {
 			}
 			retry++
 			if !SleepWithCtx(ctx, c.cfg.ReconnectDelay) {
+				c.callOnClose()
 				return ctx.Err()
 			}
 			continue
@@ -89,6 +103,13 @@ func (c *wsClient) Run(ctx context.Context) error {
 
 		c.alive.Store(true)
 		retry = 0
+
+		if first {
+			c.callOnOpen()
+			first = false
+		} else {
+			c.callOnReconnect()
+		}
 
 		errCh := make(chan error, 1)
 
@@ -99,14 +120,19 @@ func (c *wsClient) Run(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			c.Close()
+			c.callOnClose()
 			return ctx.Err()
 
 		case err := <-errCh:
+			c.callOnError(err)
 			c.Close()
+
 			if !c.cfg.Reconnect {
+				c.callOnClose()
 				return err
 			}
 			if !SleepWithCtx(ctx, c.cfg.ReconnectDelay) {
+				c.callOnClose()
 				return ctx.Err()
 			}
 		}
@@ -130,11 +156,15 @@ func (c *wsClient) readLoop(errCh chan<- error) {
 			return
 		}
 
-		// 不阻塞 IO
 		select {
 		case c.msgCh <- msg:
 		default:
-			// backpressure：丢弃
+			// 🚨 overflow → 触发重连
+			select {
+			case errCh <- ErrMsgOverflow:
+			default:
+			}
+			return
 		}
 	}
 }
@@ -224,4 +254,30 @@ func (c *wsClient) Close() error {
 		return c.conn.Close()
 	}
 	return nil
+}
+
+/* ---------- handler safe call ---------- */
+
+func (c *wsClient) callOnOpen() {
+	if c.handler != nil {
+		SafeCall(c.handler.OnOpen)
+	}
+}
+
+func (c *wsClient) callOnReconnect() {
+	if c.handler != nil {
+		SafeCall(c.handler.OnReconnect)
+	}
+}
+
+func (c *wsClient) callOnError(err error) {
+	if c.handler != nil {
+		SafeCall(func() { c.handler.OnError(err) })
+	}
+}
+
+func (c *wsClient) callOnClose() {
+	if c.handler != nil {
+		SafeCall(c.handler.OnClose)
+	}
 }

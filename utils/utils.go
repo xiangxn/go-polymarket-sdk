@@ -152,3 +152,10 @@ func SleepWithCtx(ctx context.Context, d time.Duration) bool {
 		return true
 	}
 }
+
+func SafeCall(fn func()) {
+	defer func() {
+		_ = recover()
+	}()
+	fn()
+}
