@@ -736,3 +736,30 @@ func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool) 
 	}
 	return result, nil
 }
+
+func (c *PolymarketClient) SetTickSize(tokenID string, tickSize float64) error {
+	v, err := orders.NewTickSize(utils.FloatToString(tickSize, 0))
+	if err != nil {
+		return err
+	}
+
+	c.muTickSizes.Lock()
+	defer c.muTickSizes.Unlock()
+
+	c.tickSizes[tokenID] = v
+	return nil
+}
+
+func (c *PolymarketClient) SetFeeRateBps(tokenID string, feeRateBps float64) {
+	c.muFeeRates.Lock()
+	defer c.muFeeRates.Unlock()
+
+	c.feeRates[tokenID] = feeRateBps
+}
+
+func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
+	c.muNegRisk.Lock()
+	defer c.muNegRisk.Unlock()
+
+	c.negRisk[tokenID] = negRisk
+}
