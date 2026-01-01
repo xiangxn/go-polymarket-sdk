@@ -17,6 +17,7 @@ type WSHandler interface {
 	OnReconnect()
 	OnError(err error)
 	OnClose()
+	OnMessage(msg []byte)
 }
 
 type WSClient interface {
@@ -25,6 +26,7 @@ type WSClient interface {
 	Messages() <-chan []byte
 	IsAlive() bool
 	Close() error
+	Reset() error
 }
 
 type WSConfig struct {
@@ -52,9 +54,18 @@ type wsClient struct {
 	sendCh chan []byte
 	msgCh  chan []byte
 
+	ctrlCh chan wsControl
+
 	alive atomic.Bool
 	mu    sync.Mutex
 }
+
+type wsControl int
+
+const (
+	ctrlReconnect wsControl = iota
+	ctrlClose
+)
 
 func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 	if cfg.MsgBufferSize == 0 {
@@ -74,6 +85,7 @@ func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 		cfg:     cfg,
 		handler: handler,
 		msgCh:   make(chan []byte, cfg.MsgBufferSize),
+		ctrlCh:  make(chan wsControl, 1),
 	}
 }
 
@@ -116,13 +128,25 @@ func (c *wsClient) Run(ctx context.Context) error {
 		go c.readLoop(errCh)
 		go c.writeLoop(ctx, errCh)
 		go c.pingLoop(ctx)
+		go c.messageLoop(ctx)
 
 		select {
 		case <-ctx.Done():
 			c.Close()
 			c.callOnClose()
 			return ctx.Err()
-
+		case ctrl := <-c.ctrlCh:
+			switch ctrl {
+			case ctrlReconnect:
+				c.callOnError(errors.New("manual reconnect"))
+				c.Close()
+				// 直接进入下一轮 for → 统一走重连逻辑
+				continue
+			case ctrlClose:
+				c.Close()
+				c.callOnClose()
+				return nil
+			}
 		case err := <-errCh:
 			c.callOnError(err)
 			c.Close()
@@ -203,6 +227,17 @@ func (c *wsClient) pingLoop(ctx context.Context) {
 	}
 }
 
+func (c *wsClient) messageLoop(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-c.msgCh:
+			c.callOnMessage(msg)
+		}
+	}
+}
+
 func (c *wsClient) connect() error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -256,6 +291,15 @@ func (c *wsClient) Close() error {
 	return nil
 }
 
+func (c *wsClient) Reset() error {
+	select {
+	case c.ctrlCh <- ctrlReconnect:
+		return nil
+	default:
+		return errors.New("ws control busy")
+	}
+}
+
 /* ---------- handler safe call ---------- */
 
 func (c *wsClient) callOnOpen() {
@@ -279,5 +323,11 @@ func (c *wsClient) callOnError(err error) {
 func (c *wsClient) callOnClose() {
 	if c.handler != nil {
 		SafeCall(c.handler.OnClose)
+	}
+}
+
+func (c *wsClient) callOnMessage(msg []byte) {
+	if c.handler != nil {
+		SafeCall(func() { c.handler.OnMessage(msg) })
 	}
 }
