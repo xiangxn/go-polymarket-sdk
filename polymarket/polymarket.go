@@ -101,7 +101,7 @@ func (c *PolymarketClient) Post(url string, body any, headers map[string]string)
 	}
 	Headers.OverloadHeaders(resty.MethodPost, headers)
 	request.SetHeaders(headers)
-	request.SetDebug(true)
+	// request.SetDebug(true)
 	resp, err := request.Post(url)
 	if err != nil {
 		return nil, err
