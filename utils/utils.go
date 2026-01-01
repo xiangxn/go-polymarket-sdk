@@ -69,7 +69,7 @@ func DecimalPlaces(num float64) int {
 	// 转成字符串
 	s := strconv.FormatFloat(num, 'f', -1, 64)
 	parts := strings.Split(s, ".")
-	if len(parts) < 2 {
+	if len(parts) <= 1 {
 		return 0
 	}
 

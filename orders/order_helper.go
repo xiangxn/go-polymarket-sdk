@@ -3,6 +3,7 @@ package orders
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
@@ -15,16 +16,19 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 
 	if side == model.BUY {
 		// force 2 decimals places
-		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
+		// TODO: invalid amounts, the market buy orders maker amount supports a max accuracy of 2 decimals, taker amount a max of 4 decimals
+		rawTakerAmt := utils.RoundDown(size, roundConfig.Amount)
+
+		log.Printf("rawTakerAmt: %f", rawTakerAmt)
 
 		rawMakerAmt := rawTakerAmt * rawPrice
-		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Amount+4)
-			if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
-				rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Size {
+			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Size+4)
+			if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Size {
+				rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Size)
 			}
 		}
-
+		log.Printf("rawMakerAmt: %f", rawMakerAmt)
 		return model.BUY, rawMakerAmt, rawTakerAmt
 
 	} else {
