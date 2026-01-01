@@ -53,12 +53,12 @@ func OverloadHeaders(method string, headers map[string]string) {
 		headers = make(map[string]string)
 	}
 	maps.Copy(headers, map[string]string{
-		"User-Agent":   "@polymarket/clob-client",
+		"User-Agent":   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36",
 		"Accept":       "*/*",
 		"Connection":   "keep-alive",
 		"Content-Type": "application/json",
 	})
-	if method == resty.MethodGet {
+	if method == resty.MethodGet || method == resty.MethodPost {
 		maps.Copy(headers, map[string]string{
 			"Accept-Encoding": "gzip",
 		})

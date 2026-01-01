@@ -2,6 +2,7 @@ package polymarket
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/polymarket/go-order-utils/pkg/builder"
@@ -35,7 +37,17 @@ type PolymarketClient struct {
 
 func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 
-	client := resty.New()
+	client := resty.New().SetTLSClientConfig(&tls.Config{
+		MinVersion: tls.VersionTLS12,
+		// 允许 session resumption
+		ClientSessionCache: tls.NewLRUClientSessionCache(128),
+	}).SetTransport(&http.Transport{ // 打开 KeepAlive / 连接池
+		MaxIdleConns:        200,
+		MaxIdleConnsPerHost: 200,
+		IdleConnTimeout:     120 * time.Second,
+		ForceAttemptHTTP2:   true,
+	}).SetTimeout(3 * time.Second) // 默认超时
+
 	if cfg.SocksProxy != "" {
 		client.SetProxy(cfg.SocksProxy)
 	}
