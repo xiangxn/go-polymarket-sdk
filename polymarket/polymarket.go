@@ -46,7 +46,7 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 		MaxIdleConnsPerHost: 200,
 		IdleConnTimeout:     120 * time.Second,
 		ForceAttemptHTTP2:   true,
-	}).SetTimeout(3 * time.Second) // 默认超时
+	})
 
 	if cfg.SocksProxy != "" {
 		client.SetProxy(cfg.SocksProxy)
