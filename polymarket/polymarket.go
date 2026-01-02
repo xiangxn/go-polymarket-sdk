@@ -94,7 +94,7 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	}
 	Headers.OverloadHeaders(resty.MethodGet, headers)
 	request.SetHeaders(headers)
-	// request.SetDebug(true)
+	request.SetDebug(true)
 	resp, err := request.Get(url)
 	if err != nil {
 		return nil, err
