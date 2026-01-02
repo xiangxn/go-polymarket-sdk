@@ -445,6 +445,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 			maps.Copy(headers, builderHeaders)
 		}
 	}
+	log.Printf("处理时间: %d", time.Now().UnixMilli())
 	return c.Post(url, body, headers)
 }
 
@@ -503,6 +504,7 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 			maps.Copy(headers, builderHeaders)
 		}
 	}
+	log.Printf("处理时间: %d", time.Now().UnixMilli())
 	return c.Post(url, body, headers)
 }
 
