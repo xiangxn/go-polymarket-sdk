@@ -2,16 +2,13 @@ package polymarket
 
 import (
 	"bytes"
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"maps"
-	"net"
 	"net/http"
-	"net/url"
 	"sync"
 	"time"
 
@@ -22,7 +19,6 @@ import (
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
-	"golang.org/x/net/proxy"
 	"resty.dev/v3"
 )
 
@@ -45,22 +41,7 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 		MaxIdleConnsPerHost: 200,
 		IdleConnTimeout:     120 * time.Second,
 	}
-	if cfg.SocksProxy != "" {
-		u, err := url.Parse(cfg.SocksProxy)
-		if err != nil {
-			log.Printf("Failed to parse socks proxy: %v", err)
-		}
-		// dialer, err := proxy.FromURL(u, proxy.Direct)
-		dialer, err := proxy.SOCKS5("tcp", u.Host, nil, proxy.Direct)
-		if err != nil {
-			log.Printf("Failed to create socks proxy dialer: %v", err)
-		}
-		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return dialer.Dial(network, addr)
-		}
-		transport.ForceAttemptHTTP2 = false
-		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
-	} else {
+	if cfg.SocksProxy == "" {
 		transport.Proxy = http.ProxyFromEnvironment
 		transport.ForceAttemptHTTP2 = true
 	}
@@ -69,6 +50,10 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 		// 允许 session resumption
 		ClientSessionCache: tls.NewLRUClientSessionCache(128),
 	}).SetTransport(transport)
+
+	if cfg.SocksProxy != "" {
+		client.SetProxy(cfg.SocksProxy)
+	}
 
 	if cfg.HttpTimeout > 0 {
 		client.SetTimeout(cfg.HttpTimeout)
