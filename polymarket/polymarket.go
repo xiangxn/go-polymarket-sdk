@@ -2,12 +2,14 @@ package polymarket
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"maps"
+	"net"
 	"net/http"
 	"net/url"
 	"sync"
@@ -39,16 +41,28 @@ type PolymarketClient struct {
 
 func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 	transport := &http.Transport{ // 打开 KeepAlive / 连接池
-		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 200,
 		IdleConnTimeout:     120 * time.Second,
-		ForceAttemptHTTP2:   true,
 	}
 	if cfg.SocksProxy != "" {
-		u, _ := url.Parse(cfg.SocksProxy)
-		dialer, _ := proxy.FromURL(u, proxy.Direct)
-		transport.DialContext = dialer.(proxy.ContextDialer).DialContext
+		u, err := url.Parse(cfg.SocksProxy)
+		if err != nil {
+			log.Printf("Failed to parse socks proxy: %v", err)
+		}
+		// dialer, err := proxy.FromURL(u, proxy.Direct)
+		dialer, err := proxy.SOCKS5("tcp", u.Host, nil, proxy.Direct)
+		if err != nil {
+			log.Printf("Failed to create socks proxy dialer: %v", err)
+		}
+		transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.Dial(network, addr)
+		}
+		transport.ForceAttemptHTTP2 = false
+		transport.TLSNextProto = map[string]func(string, *tls.Conn) http.RoundTripper{}
+	} else {
+		transport.Proxy = http.ProxyFromEnvironment
+		transport.ForceAttemptHTTP2 = true
 	}
 	client := resty.New().SetTLSClientConfig(&tls.Config{
 		MinVersion: tls.VersionTLS12,
