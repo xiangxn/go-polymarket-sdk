@@ -56,8 +56,9 @@ type wsClient struct {
 
 	ctrlCh chan wsControl
 
-	alive atomic.Bool
-	mu    sync.Mutex
+	alive   atomic.Bool
+	mu      sync.Mutex
+	writeMu sync.Mutex
 }
 
 type wsControl int
@@ -85,8 +86,21 @@ func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 		cfg:     cfg,
 		handler: handler,
 		msgCh:   make(chan []byte, cfg.MsgBufferSize),
+		sendCh:  make(chan []byte, cfg.MsgBufferSize),
 		ctrlCh:  make(chan wsControl, 1),
 	}
+}
+
+func (c *wsClient) writeMessage(mt int, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+
+	if c.conn == nil {
+		return errors.New("conn is nil")
+	}
+
+	c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
+	return c.conn.WriteMessage(mt, data)
 }
 
 func (c *wsClient) Run(ctx context.Context) error {
@@ -113,53 +127,63 @@ func (c *wsClient) Run(ctx context.Context) error {
 			continue
 		}
 
-		c.alive.Store(true)
-		retry = 0
+		func() {
+			myCtx, cancel := context.WithCancel(ctx)
+			defer cancel()
 
-		if first {
-			c.callOnOpen()
-			first = false
-		} else {
-			c.callOnReconnect()
-		}
+			c.alive.Store(true)
+			retry = 0
 
-		errCh := make(chan error, 1)
+			if first {
+				c.callOnOpen()
+				first = false
+			} else {
+				c.callOnReconnect()
+			}
 
-		go c.readLoop(errCh)
-		go c.writeLoop(ctx, errCh)
-		go c.pingLoop(ctx)
-		go c.messageLoop(ctx)
+			errCh := make(chan error, 1)
 
-		select {
-		case <-ctx.Done():
-			c.Close()
-			c.callOnClose()
-			return ctx.Err()
-		case ctrl := <-c.ctrlCh:
-			switch ctrl {
-			case ctrlReconnect:
-				c.callOnError(errors.New("manual reconnect"))
-				c.Close()
-				// 直接进入下一轮 for → 统一走重连逻辑
-				continue
-			case ctrlClose:
+			go c.readLoop(errCh)
+			go c.writeLoop(myCtx, errCh)
+			go c.pingLoop(myCtx)
+			go c.messageLoop(myCtx)
+
+			select {
+			case <-ctx.Done():
 				c.Close()
 				c.callOnClose()
-				return nil
-			}
-		case err := <-errCh:
-			c.callOnError(err)
-			c.Close()
+				cancel()
+				return
+			case ctrl := <-c.ctrlCh:
+				switch ctrl {
+				case ctrlReconnect:
+					c.callOnError(errors.New("manual reconnect"))
+					cancel()
+					c.Close()
+					// 直接进入下一轮 for → 统一走重连逻辑
+					return
+				case ctrlClose:
+					c.Close()
+					c.callOnClose()
+					cancel()
+					return
+				}
+			case err := <-errCh:
+				c.callOnError(err)
+				c.Close()
 
-			if !c.cfg.Reconnect {
-				c.callOnClose()
-				return err
+				if !c.cfg.Reconnect {
+					c.callOnClose()
+					cancel()
+					return
+				}
+				if !SleepWithCtx(ctx, c.cfg.ReconnectDelay) {
+					c.callOnClose()
+					cancel()
+					return
+				}
 			}
-			if !SleepWithCtx(ctx, c.cfg.ReconnectDelay) {
-				c.callOnClose()
-				return ctx.Err()
-			}
-		}
+		}()
 	}
 }
 
@@ -200,8 +224,7 @@ func (c *wsClient) writeLoop(ctx context.Context, errCh chan<- error) {
 			return
 
 		case msg := <-c.sendCh:
-			c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+			if err := c.writeMessage(websocket.TextMessage, msg); err != nil {
 				select {
 				case errCh <- err:
 				default:
@@ -221,8 +244,7 @@ func (c *wsClient) pingLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			c.conn.SetWriteDeadline(time.Now().Add(5 * time.Second))
-			_ = c.conn.WriteMessage(websocket.PingMessage, nil)
+			_ = c.writeMessage(websocket.PingMessage, nil)
 		}
 	}
 }
@@ -255,7 +277,6 @@ func (c *wsClient) connect() error {
 	}
 
 	c.conn = conn
-	c.sendCh = make(chan []byte, c.cfg.MsgBufferSize)
 
 	return nil
 }
