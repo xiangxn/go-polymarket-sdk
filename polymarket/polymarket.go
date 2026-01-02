@@ -9,6 +9,7 @@ import (
 	"log"
 	"maps"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
+	"golang.org/x/net/proxy"
 	"resty.dev/v3"
 )
 
@@ -36,21 +38,24 @@ type PolymarketClient struct {
 }
 
 func NewClient(signerKey string, cfg *Config) *PolymarketClient {
-
-	client := resty.New().SetTLSClientConfig(&tls.Config{
-		MinVersion: tls.VersionTLS12,
-		// 允许 session resumption
-		ClientSessionCache: tls.NewLRUClientSessionCache(128),
-	}).SetTransport(&http.Transport{ // 打开 KeepAlive / 连接池
+	transport := &http.Transport{ // 打开 KeepAlive / 连接池
+		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 200,
 		IdleConnTimeout:     120 * time.Second,
 		ForceAttemptHTTP2:   true,
-	})
-
-	if cfg.SocksProxy != "" {
-		client.SetProxy(cfg.SocksProxy)
 	}
+	if cfg.SocksProxy != "" {
+		u, _ := url.Parse(cfg.SocksProxy)
+		dialer, _ := proxy.FromURL(u, proxy.Direct)
+		transport.DialContext = dialer.(proxy.ContextDialer).DialContext
+	}
+	client := resty.New().SetTLSClientConfig(&tls.Config{
+		MinVersion: tls.VersionTLS12,
+		// 允许 session resumption
+		ClientSessionCache: tls.NewLRUClientSessionCache(128),
+	}).SetTransport(transport)
+
 	if cfg.HttpTimeout > 0 {
 		client.SetTimeout(cfg.HttpTimeout)
 	}
@@ -94,7 +99,7 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	}
 	Headers.OverloadHeaders(resty.MethodGet, headers)
 	request.SetHeaders(headers)
-	request.SetDebug(true)
+	// request.SetDebug(true)
 	resp, err := request.Get(url)
 	if err != nil {
 		return nil, err
