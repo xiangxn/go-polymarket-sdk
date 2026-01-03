@@ -143,9 +143,9 @@ func (c *wsClient) Run(ctx context.Context) error {
 
 			errCh := make(chan error, 1)
 
-			go c.readLoop(errCh)
+			go c.readLoop(myCtx, errCh)
 			go c.writeLoop(myCtx, errCh)
-			go c.pingLoop(myCtx)
+			go c.pingLoop(myCtx, errCh)
 			go c.messageLoop(myCtx)
 
 			select {
@@ -160,7 +160,6 @@ func (c *wsClient) Run(ctx context.Context) error {
 					c.callOnError(errors.New("manual reconnect"))
 					cancel()
 					c.Close()
-					// 直接进入下一轮 for → 统一走重连逻辑
 					return
 				case ctrlClose:
 					c.Close()
@@ -187,7 +186,7 @@ func (c *wsClient) Run(ctx context.Context) error {
 	}
 }
 
-func (c *wsClient) readLoop(errCh chan<- error) {
+func (c *wsClient) readLoop(ctx context.Context, errCh chan<- error) {
 	c.conn.SetReadLimit(1 << 20)
 	_ = c.conn.SetReadDeadline(time.Now().Add(c.cfg.PongWait))
 	c.conn.SetPongHandler(func(string) error {
@@ -205,6 +204,8 @@ func (c *wsClient) readLoop(errCh chan<- error) {
 		}
 
 		select {
+		case <-ctx.Done():
+			return
 		case c.msgCh <- msg:
 		default:
 			// 🚨 overflow → 触发重连
@@ -235,7 +236,7 @@ func (c *wsClient) writeLoop(ctx context.Context, errCh chan<- error) {
 	}
 }
 
-func (c *wsClient) pingLoop(ctx context.Context) {
+func (c *wsClient) pingLoop(ctx context.Context, errCh chan<- error) {
 	ticker := time.NewTicker(c.cfg.PingInterval)
 	defer ticker.Stop()
 
@@ -244,7 +245,13 @@ func (c *wsClient) pingLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_ = c.writeMessage(websocket.PingMessage, nil)
+			if err := c.writeMessage(websocket.PingMessage, nil); err != nil {
+				select {
+				case errCh <- err:
+				default:
+				}
+				return
+			}
 		}
 	}
 }
