@@ -205,6 +205,19 @@ func (c *PolymarketClient) FetchMarketBySlug(slug string) (*gjson.Result, error)
 	return c.Get(url, nil, nil)
 }
 
+func (c *PolymarketClient) FetchEventBySlug(slug string) (*gjson.Result, error) {
+	if slug == "" {
+		return nil, fmt.Errorf("slug cannot be empty")
+	}
+	url := fmt.Sprintf(
+		"%s/events/slug/%s",
+		c.cfg.Polymarket.GammaBaseURL,
+		slug,
+	)
+
+	return c.Get(url, nil, nil)
+}
+
 func (c *PolymarketClient) GetTickSize(tokenID string) (orders.TickSize, error) {
 	if tokenID == "" {
 		return "", fmt.Errorf("tokenID cannot be empty")
