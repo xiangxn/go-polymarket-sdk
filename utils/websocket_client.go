@@ -81,6 +81,9 @@ func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 	if cfg.ReconnectDelay == 0 {
 		cfg.ReconnectDelay = 5 * time.Second
 	}
+	if cfg.Reconnect && cfg.MaxReconnect == 0 { // 如果开启重连但未设置最大重连次数时，默认重连3次
+		cfg.MaxReconnect = 3
+	}
 
 	return &wsClient{
 		cfg:     cfg,
