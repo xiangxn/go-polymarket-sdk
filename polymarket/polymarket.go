@@ -640,8 +640,8 @@ func (c *PolymarketClient) GetOrderBook(tokenID string) (*OrderBookSummary, erro
 		Market:       result.Get("market").String(),
 		AssetId:      result.Get("asset_id").String(),
 		Timestamp:    result.Get("timestamp").Int(),
-		MinOrderSize: result.Get("min_order_size").String(),
-		TickSize:     result.Get("tick_size").String(),
+		MinOrderSize: result.Get("min_order_size").Float(),
+		TickSize:     result.Get("tick_size").Float(),
 		NegRisk:      result.Get("neg_risk").Bool(),
 		Hash:         result.Get("hash").String(),
 	}
@@ -679,8 +679,8 @@ func (c *PolymarketClient) GetOrderBooks(params []BookParams) ([]OrderBookSummar
 			Market:       item.Get("market").String(),
 			AssetId:      item.Get("asset_id").String(),
 			Timestamp:    item.Get("timestamp").Int(),
-			MinOrderSize: item.Get("min_order_size").String(),
-			TickSize:     item.Get("tick_size").String(),
+			MinOrderSize: item.Get("min_order_size").Float(),
+			TickSize:     item.Get("tick_size").Float(),
 			NegRisk:      item.Get("neg_risk").Bool(),
 			Hash:         item.Get("hash").String(),
 		}

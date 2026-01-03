@@ -30,8 +30,8 @@ type OrderBookSummary struct {
 	Timestamp    int64         `json:"timestamp"`
 	Bids         []orders.Book `json:"bids"`
 	Asks         []orders.Book `json:"asks"`
-	MinOrderSize string        `json:"min_order_size"`
-	TickSize     string        `json:"tick_size"`
+	MinOrderSize float64       `json:"min_order_size"`
+	TickSize     float64       `json:"tick_size"`
 	NegRisk      bool          `json:"neg_risk"`
 	Hash         string        `json:"hash"`
 }
