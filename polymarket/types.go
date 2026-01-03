@@ -37,8 +37,8 @@ type OrderBookSummary struct {
 }
 
 type BookParams struct {
-	TokenId string          `json:"token_id"`
-	Side    orders.SideType `json:"side"`
+	TokenId string           `json:"token_id"`
+	Side    *orders.SideType `json:"side,omitempty"`
 }
 
 // PriceData 表示价格数据

@@ -30,12 +30,13 @@ func TestGetOrderBooks(t *testing.T) {
 	tokenID2 := os.Getenv("TOKENID2")
 	client := polymarket.NewClient(privateKey, config)
 
+	side := orders.BUY
 	orderBooks, err := client.GetOrderBooks([]polymarket.BookParams{{
 		TokenId: tokenID,
-		Side:    orders.BUY,
+		Side:    &side,
 	}, {
 		TokenId: tokenID2,
-		Side:    orders.BUY,
+		Side:    &side,
 	}})
 	if err != nil {
 		t.Fatal(err)
