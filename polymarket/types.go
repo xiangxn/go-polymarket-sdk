@@ -41,13 +41,17 @@ type BookParams struct {
 	Side    *orders.SideType `json:"side,omitempty"`
 }
 
-// PriceData 表示价格数据
+// PriceData 表示价格数据,这个数据中的(MinOrderSize,TickSize,NegRisk)只在rest api中返回,ws api不返回
 type PriceData struct {
 	TokenID   string       `json:"tokenId"`
 	BestAsk   *orders.Book `json:"bestAsk,omitempty"`
 	BestBid   *orders.Book `json:"bestBid,omitempty"`
 	Market    string       `json:"market"`
 	Timestamp int64        `json:"timestamp"`
+
+	MinOrderSize float64 `json:"min_order_size"`
+	TickSize     float64 `json:"tick_size"`
+	NegRisk      bool    `json:"neg_risk"`
 }
 
 // PriceUpdateCallback 价格更新回调函数类型
