@@ -43,14 +43,11 @@ type BookParams struct {
 
 // PriceData 表示价格数据
 type PriceData struct {
-	TokenID      string       `json:"tokenId"`
-	BestAsk      *orders.Book `json:"bestAsk,omitempty"`
-	BestBid      *orders.Book `json:"bestBid,omitempty"`
-	Market       string       `json:"market"`
-	Timestamp    int64        `json:"timestamp"`
-	MinOrderSize float64      `json:"min_order_size"`
-	TickSize     float64      `json:"tick_size"`
-	NegRisk      bool         `json:"neg_risk"`
+	TokenID   string       `json:"tokenId"`
+	BestAsk   *orders.Book `json:"bestAsk,omitempty"`
+	BestBid   *orders.Book `json:"bestBid,omitempty"`
+	Market    string       `json:"market"`
+	Timestamp int64        `json:"timestamp"`
 }
 
 // PriceUpdateCallback 价格更新回调函数类型
