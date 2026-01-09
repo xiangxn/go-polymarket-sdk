@@ -14,6 +14,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/xiangxn/go-polymarket-sdk/headers"
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
+	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 	"resty.dev/v3"
 )
@@ -23,11 +24,11 @@ type RelayClient struct {
 	chainId            *big.Int
 	http               *resty.Client
 	signer             *polymarket.Signer
-	BuilderCreds       *headers.ApiKeyCreds
+	BuilderCreds       *model.ApiKeyCreds
 	safeContractConfig *SafeContractConfig
 }
 
-func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *headers.ApiKeyCreds, safeContractConfig *SafeContractConfig) *RelayClient {
+func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *model.ApiKeyCreds, safeContractConfig *SafeContractConfig) *RelayClient {
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
 		panic(err)

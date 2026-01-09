@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
-	"github.com/xiangxn/go-polymarket-sdk/headers"
+	myModel "github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 )
@@ -63,7 +63,7 @@ func TestPlaceOrder(t *testing.T) {
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID2")
 
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
@@ -102,7 +102,7 @@ func TestPlaceOrders(t *testing.T) {
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID2")
 
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
@@ -162,7 +162,7 @@ func TestCancelOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	privateKey := os.Getenv("SIGNERKEY")
 	orderID := os.Getenv("ORDERID")
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
@@ -181,7 +181,7 @@ func TestCancelOrders(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	privateKey := os.Getenv("SIGNERKEY")
 	orderID := os.Getenv("ORDERID")
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
@@ -198,7 +198,7 @@ func TestCancelOrders(t *testing.T) {
 
 func TestPlaceMarketOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
@@ -236,7 +236,7 @@ func TestPlaceMarketOrder(t *testing.T) {
 
 func TestGetOpenOrders(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	config.Polymarket.CLOBCreds = &headers.ApiKeyCreds{
+	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),

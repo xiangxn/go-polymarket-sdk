@@ -5,7 +5,7 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/xiangxn/go-polymarket-sdk/headers"
+	"github.com/xiangxn/go-polymarket-sdk/model"
 )
 
 type PolymarketConfig struct {
@@ -17,8 +17,8 @@ type PolymarketConfig struct {
 	RelayerBaseURL string   `mapstructure:"relayer_base_url"`
 	DataAPIBaseURL string   `mapstructure:"data_api_base_url"`
 
-	CLOBCreds    *headers.ApiKeyCreds `mapstructure:"clob_creds"`
-	BuilderCreds *headers.ApiKeyCreds `mapstructure:"builder_creds"`
+	CLOBCreds    *model.ApiKeyCreds `mapstructure:"clob_creds"`
+	BuilderCreds *model.ApiKeyCreds `mapstructure:"builder_creds"`
 }
 
 type Config struct {

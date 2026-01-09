@@ -6,11 +6,12 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/signature"
 	"resty.dev/v3"
 )
 
-func CreateL2Headers(signer common.Address, creds *ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
+func CreateL2Headers(signer common.Address, creds *model.ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
 	if timestamp == nil {
 		now := time.Now().Unix()
 		timestamp = &now
@@ -31,7 +32,7 @@ func CreateL2Headers(signer common.Address, creds *ApiKeyCreds, l2HeaderArgs *L2
 	}
 }
 
-func CreateBuilderHeaders(builderCreds *ApiKeyCreds, method string, path string, body *string, timestamp *int64) map[string]string {
+func CreateBuilderHeaders(builderCreds *model.ApiKeyCreds, method string, path string, body *string, timestamp *int64) map[string]string {
 	if timestamp == nil {
 		now := time.Now().Unix()
 		timestamp = &now
