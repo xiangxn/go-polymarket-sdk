@@ -799,8 +799,8 @@ func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime ti
 	url := "https://polymarket.com/api/crypto/crypto-price"
 	params := map[string]string{
 		"symbol":    string(symbol),
-		"startTime": startTime.Format(time.RFC3339),
-		"endDate":   endDate.Format(time.RFC3339),
+		"startTime": utils.ToISOString(startTime),
+		"endDate":   utils.ToISOString(endDate),
 		"variant":   string(variant),
 	}
 	result, err := c.Get(url, params, nil)
