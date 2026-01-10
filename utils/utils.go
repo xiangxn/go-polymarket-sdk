@@ -159,3 +159,9 @@ func SafeCall(fn func()) {
 	}()
 	fn()
 }
+
+func ToISOString(t time.Time) string {
+	return t.UTC().
+		Truncate(time.Millisecond).
+		Format("2006-01-02T15:04:05.000Z")
+}

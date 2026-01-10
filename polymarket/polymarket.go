@@ -794,3 +794,18 @@ func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
 
 	c.negRisk[tokenID] = negRisk
 }
+
+func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint) float64 {
+	url := "https://polymarket.com/api/crypto/crypto-price"
+	params := map[string]string{
+		"symbol":    string(symbol),
+		"startTime": startTime.Format(time.RFC3339),
+		"endDate":   endDate.Format(time.RFC3339),
+		"variant":   string(variant),
+	}
+	result, err := c.Get(url, params, nil)
+	if err != nil {
+		return 0
+	}
+	return result.Get("openPrice").Float()
+}

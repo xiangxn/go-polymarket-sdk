@@ -71,3 +71,23 @@ type WSMessage struct {
 	Bids      []orders.Book `json:"bids"`
 	Asks      []orders.Book `json:"asks"`
 }
+
+type CryptoPriceSymbol string
+
+const (
+	SOL CryptoPriceSymbol = "SOL"
+	BTC CryptoPriceSymbol = "BTC"
+	ETH CryptoPriceSymbol = "ETH"
+	XRP CryptoPriceSymbol = "XRP"
+)
+
+type CryptoPriceUint string
+
+const (
+	Fifteen  CryptoPriceUint = "fifteen"
+	Hourly   CryptoPriceUint = "hourly"
+	Fourhour CryptoPriceUint = "fourhour"
+	Daily    CryptoPriceUint = "daily"
+	Weekly   CryptoPriceUint = "weekly"
+	Monthly  CryptoPriceUint = "monthly"
+)
