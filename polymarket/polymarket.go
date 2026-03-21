@@ -447,7 +447,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 		return nil, err
 	}
 	body := string(data)
-	log.Printf("body: %s", body)
+	log.Printf("PostOrder body: %s", body)
 	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "POST",
 		RequestPath: path,
@@ -462,7 +462,7 @@ func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.
 			maps.Copy(headers, builderHeaders)
 		}
 	}
-	log.Printf("处理时间: %d", time.Now().UnixMilli())
+	log.Printf("PostOrder 处理时间: %d", time.Now().UnixMilli())
 	return c.Post(url, body, headers)
 }
 
@@ -477,7 +477,7 @@ func (c *PolymarketClient) CancelOrder(payload *orders.OrderPayload) (*gjson.Res
 		return nil, err
 	}
 	body := string(data)
-	log.Printf("body: %s", body)
+	log.Printf("CancelOrder body: %s", body)
 
 	l2HeaderArgs := Headers.L2HeaderArgs{
 		Method:      "DELETE",

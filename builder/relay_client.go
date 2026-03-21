@@ -172,7 +172,7 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata 
 		return nil, err
 	}
 	body := string(requestPayload)
-	// log.Printf("body: %s", body)
+	// log.Printf("EexecuteSafeTransactions body: %s", body)
 	var builderHeaders map[string]string
 	if c.BuilderCreds != nil {
 		builderHeaders = headers.CreateBuilderHeaders(c.BuilderCreds, resty.MethodPost, SUBMIT_TRANSACTION, &body, nil)
