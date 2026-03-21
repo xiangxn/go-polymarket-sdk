@@ -3,6 +3,7 @@ package orders
 import (
 	"encoding/hex"
 	"fmt"
+	"log"
 	"strconv"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
@@ -74,6 +75,7 @@ func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, ro
 
 func BuildOrderCreationArgs(signer string, maker string, signatureType model.SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*model.OrderData, error) {
 	side, rawMakerAmt, rawTakerAmt := GetOrderRawAmounts(userOrder.Side, userOrder.Size, userOrder.Price, roundConfig)
+	log.Printf("BuildOrderCreationArgs rawMakerAmt: %f, rawTakerAmt: %f", rawMakerAmt, rawTakerAmt)
 	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
