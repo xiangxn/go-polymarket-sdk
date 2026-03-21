@@ -3,7 +3,6 @@ package orders
 import (
 	"encoding/hex"
 	"fmt"
-	"log"
 	"strconv"
 
 	"github.com/polymarket/go-order-utils/pkg/model"
@@ -16,18 +15,12 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 
 	if side == model.BUY {
 		// force 2 decimals places
-		// TODO: invalid amounts, the market buy orders maker amount supports a max accuracy of 2 decimals, taker amount a max of 4 decimals
-		rawTakerAmt := utils.RoundDown(size, roundConfig.Amount)
+		rawTakerAmt := utils.RoundUp(size, roundConfig.Amount)
 
-		// log.Printf("rawTakerAmt: %f", rawTakerAmt)
-
+		// log.Printf("rawTakerAmt: %f, size: %f, Amount: %d", rawTakerAmt, size, roundConfig.Amount)
 		rawMakerAmt := rawTakerAmt * rawPrice
-		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Size {
-			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Size+4)
-			if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Size {
-				rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Size)
-			}
-		}
+		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Size)
+
 		// log.Printf("rawMakerAmt: %f", rawMakerAmt)
 		return model.BUY, rawMakerAmt, rawTakerAmt
 
@@ -35,12 +28,7 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		rawTakerAmt := rawMakerAmt * rawPrice
-		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-			}
-		}
+		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
 
 		return model.SELL, rawMakerAmt, rawTakerAmt
 	}
@@ -53,29 +41,19 @@ func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, ro
 	if side == model.BUY {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt / rawPrice
-		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-			}
-		}
+		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
 		return model.BUY, rawMakerAmt, rawTakerAmt
 	} else {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt * rawPrice
-		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
-			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
-				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-			}
-		}
+		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
 		return model.SELL, rawMakerAmt, rawTakerAmt
 	}
 }
 
 func BuildOrderCreationArgs(signer string, maker string, signatureType model.SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*model.OrderData, error) {
 	side, rawMakerAmt, rawTakerAmt := GetOrderRawAmounts(userOrder.Side, userOrder.Size, userOrder.Price, roundConfig)
-	log.Printf("BuildOrderCreationArgs rawMakerAmt: %f, rawTakerAmt: %f", rawMakerAmt, rawTakerAmt)
+	// log.Printf("BuildOrderCreationArgs rawMakerAmt: %f, rawTakerAmt: %f", rawMakerAmt, rawTakerAmt)
 	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err

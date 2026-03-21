@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"github.com/tidwall/gjson"
 )
 
@@ -37,43 +38,35 @@ func RoundTo15Minutes(date ...time.Time) int64 {
 }
 
 func RoundNormal(num float64, decimals int) float64 {
-	if DecimalPlaces(num) <= decimals {
-		return num
-	}
-	multiplier := math.Pow10(decimals)
-	return math.Round((num+math.SmallestNonzeroFloat64)*multiplier) / multiplier
+	d := decimal.NewFromFloat(num)
+	scale := decimal.New(1, int32(-decimals))
+
+	return d.Div(scale).Round(0).Mul(scale).InexactFloat64()
 }
 
 func RoundDown(num float64, decimals int) float64 {
-	if DecimalPlaces(num) <= decimals {
-		return num
-	}
-	multiplier := math.Pow10(decimals)
-	return math.Floor(num*multiplier) / multiplier
+	// if DecimalPlaces(num) <= decimals {
+	// 	log.Printf("1 === decimals: %d", decimals)
+	// 	return num
+	// }
+	// multiplier := math.Pow10(decimals)
+	// return math.Floor(num*multiplier) / multiplier
+
+	d := decimal.NewFromFloat(num)
+	scale := decimal.New(1, int32(-decimals))
+	return d.Div(scale).Floor().Mul(scale).InexactFloat64()
 }
 
 func RoundUp(num float64, decimals int) float64 {
-	if DecimalPlaces(num) <= decimals {
-		return num
-	}
-	multiplier := math.Pow10(decimals)
-	return math.Ceil(num*multiplier) / multiplier
-}
+	// if DecimalPlaces(num) <= decimals {
+	// 	return num
+	// }
+	// multiplier := math.Pow10(decimals)
+	// return math.Ceil(num*multiplier) / multiplier
 
-func DecimalPlaces(num float64) int {
-	// 先判断整数
-	if num == float64(int64(num)) {
-		return 0
-	}
-
-	// 转成字符串
-	s := strconv.FormatFloat(num, 'f', -1, 64)
-	parts := strings.Split(s, ".")
-	if len(parts) <= 1 {
-		return 0
-	}
-
-	return len(parts[1])
+	d := decimal.NewFromFloat(num)
+	scale := decimal.New(1, int32(-decimals))
+	return d.Div(scale).Ceil().Mul(scale).InexactFloat64()
 }
 
 func ParseUnits(amount string, decimals int) (*big.Int, error) {
