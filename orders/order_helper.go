@@ -15,11 +15,11 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 
 	if side == model.BUY {
 		// force 2 decimals places
-		rawTakerAmt := utils.RoundUp(size, roundConfig.Amount)
+		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		// log.Printf("rawTakerAmt: %f, size: %f, Amount: %d", rawTakerAmt, size, roundConfig.Amount)
 		rawMakerAmt := rawTakerAmt * rawPrice
-		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Size)
+		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
 
 		// log.Printf("rawMakerAmt: %f", rawMakerAmt)
 		return model.BUY, rawMakerAmt, rawTakerAmt
@@ -28,7 +28,7 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		rawTakerAmt := rawMakerAmt * rawPrice
-		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
+		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 
 		return model.SELL, rawMakerAmt, rawTakerAmt
 	}
@@ -41,12 +41,12 @@ func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, ro
 	if side == model.BUY {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt / rawPrice
-		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
+		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 		return model.BUY, rawMakerAmt, rawTakerAmt
 	} else {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt * rawPrice
-		rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
+		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 		return model.SELL, rawMakerAmt, rawTakerAmt
 	}
 }
