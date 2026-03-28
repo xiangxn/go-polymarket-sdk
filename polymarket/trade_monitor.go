@@ -107,7 +107,7 @@ func (tm *TradeMonitor) subscribeUserTrade() {
 	}
 
 	subscribeMessage := sdkModel.SubscribeUserMessage{
-		Type:    "USER",
+		Type:    "user",
 		Markets: []string{},
 		Auth:    tm.getAuth(),
 	}
@@ -118,12 +118,12 @@ func (tm *TradeMonitor) subscribeUserTrade() {
 	}
 }
 
-func (tm *TradeMonitor) getAuth() sdkModel.ApiKeyCreds {
+func (tm *TradeMonitor) getAuth() *sdkModel.WSUserAuth {
 	if tm.creds == nil {
-		return sdkModel.ApiKeyCreds{}
+		return nil
 	}
-	return sdkModel.ApiKeyCreds{
-		Key:        tm.creds.Key,
+	return &sdkModel.WSUserAuth{
+		APIKey:     tm.creds.Key,
 		Secret:     tm.creds.Secret,
 		Passphrase: tm.creds.Passphrase,
 	}

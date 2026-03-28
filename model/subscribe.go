@@ -1,9 +1,15 @@
 package model
 
 type SubscribeUserMessage struct {
-	Type    string   `json:"type"`
-	Markets []string `json:"markets"`
-	Auth    any      `json:"auth"`
+	Type    string      `json:"type"`
+	Markets []string    `json:"markets"`
+	Auth    *WSUserAuth `json:"auth,omitempty"`
+}
+
+type WSUserAuth struct {
+	APIKey     string `json:"apiKey"`
+	Secret     string `json:"secret"`
+	Passphrase string `json:"passphrase"`
 }
 
 type ApiKeyCreds struct {
