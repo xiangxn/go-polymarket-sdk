@@ -28,41 +28,41 @@ type WSOrder struct {
 	OriginalSize    string   `json:"original_size"`
 	Outcome         string   `json:"outcome"`
 	Owner           string   `json:"owner"`
-	Price           float64  `json:"price"`
+	Price           float64  `json:"price,string"`
 	Side            string   `json:"side"`
-	SizeMatched     float64  `json:"size_matched"`
-	Timestamp       int64    `json:"timestamp"`
+	SizeMatched     float64  `json:"size_matched,string"`
+	Timestamp       int64    `json:"timestamp,string"`
 	Type            string   `json:"type"`
 }
 
 type WSMakerOrder struct {
 	AssetId       string  `json:"asset_id"`
-	MatchedAmount float64 `json:"matched_amount"`
+	MatchedAmount float64 `json:"matched_amount,string"`
 	OrderId       string  `json:"order_id"`
 	Outcome       string  `json:"outcome"`
 	Owner         string  `json:"owner"`
 	Side          string  `json:"side"`
-	Price         float64 `json:"price"`
-	FeeRateBps    float64 `json:"fee_rate_bps"`
+	Price         float64 `json:"price,string"`
+	FeeRateBps    float64 `json:"fee_rate_bps,string"`
 }
 
 type WSTrade struct {
 	AssetId      string         `json:"asset_id"`
 	EventType    string         `json:"event_type"`
 	Id           string         `json:"id"`
-	LastUpdate   int64          `json:"last_update"`
+	LastUpdate   int64          `json:"last_update,string"`
 	MakerOrders  []WSMakerOrder `json:"maker_orders"`
 	Market       string         `json:"market"`
-	Matchtime    int64          `json:"matchtime"`
+	Matchtime    int64          `json:"matchtime,string"`
 	Outcome      string         `json:"outcome"`
 	Owner        string         `json:"owner"`
-	Price        float64        `json:"price"`
+	Price        float64        `json:"price,string"`
 	Side         string         `json:"side"`
-	Size         float64        `json:"size"`
-	FeeRateBps   float64        `json:"fee_rate_bps"`
+	Size         float64        `json:"size,string"`
+	FeeRateBps   float64        `json:"fee_rate_bps,string"`
 	Status       string         `json:"status"`
 	TakerOrderId string         `json:"taker_order_id"`
-	Timestamp    int64          `json:"timestamp"`
+	Timestamp    int64          `json:"timestamp,string"`
 	TradeOwner   string         `json:"trade_owner"`
 	Type         string         `json:"type"`
 }
