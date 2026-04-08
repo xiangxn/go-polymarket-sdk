@@ -15,6 +15,7 @@ import (
 func TestPriceManager(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	privateKey := os.Getenv("SIGNERKEY")
+	log.Printf("privateKey: %s", privateKey)
 	polymarketClient := polymarket.NewClient(privateKey, config)
 	for {
 		marketSlug := fmt.Sprintf("eth-updown-15m-%d", utils.RoundTo15Minutes())

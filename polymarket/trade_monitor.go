@@ -21,6 +21,7 @@ type Fill struct {
 	OrderID  string
 	MarketID string
 	TokenID  string
+	Status   string
 
 	Side  pmModel.Side
 	Price float64
@@ -34,18 +35,23 @@ type Fill struct {
 type TradeMonitor struct {
 	ws             utils.WSClient
 	creds          *sdkModel.ApiKeyCreds
-	funderAddress  string
 	clobUserWSSURL string
+	// MATCHED, MINED, CONFIRMED
+	subscribeTradeStatus string // ALL, MATCHED, MINED, CONFIRMED
 
 	fillCh chan Fill
 }
 
-func NewTradeMonitor(wsBaseURL string, funderAddress string, creds *sdkModel.ApiKeyCreds) *TradeMonitor {
+func NewTradeMonitor(wsBaseURL string, subscribeStatus string, creds *sdkModel.ApiKeyCreds) *TradeMonitor {
+	tradeStatus := "ALL"
+	if subscribeStatus != "" && subscribeStatus != tradeStatus {
+		tradeStatus = strings.ToUpper(subscribeStatus)
+	}
 	return &TradeMonitor{
-		creds:          creds,
-		clobUserWSSURL: fmt.Sprintf("%s/ws/user", wsBaseURL),
-		funderAddress:  strings.ToLower(funderAddress),
-		fillCh:         make(chan Fill, 4096),
+		creds:                creds,
+		clobUserWSSURL:       fmt.Sprintf("%s/ws/user", wsBaseURL),
+		subscribeTradeStatus: tradeStatus,
+		fillCh:               make(chan Fill, 4096),
 	}
 }
 
@@ -130,10 +136,7 @@ func (tm *TradeMonitor) getAuth() *sdkModel.WSUserAuth {
 }
 
 func (tm *TradeMonitor) isTargetOwner(owner string) bool {
-	if tm.funderAddress == "" {
-		return true
-	}
-	return strings.EqualFold(owner, tm.funderAddress)
+	return strings.EqualFold(owner, tm.creds.Key)
 }
 
 func (tm *TradeMonitor) emitFill(fill Fill) {
@@ -156,16 +159,25 @@ func (tm *TradeMonitor) handleMessage(msg []byte) {
 		return
 	}
 
+	if tm.subscribeTradeStatus != "ALL" {
+		eventStatus := gjson.GetBytes(msg, "status").String()
+		if eventStatus != tm.subscribeTradeStatus {
+			return
+		}
+	}
+
 	var wsTrade sdkModel.WSTrade
 	if err := json.Unmarshal(msg, &wsTrade); err != nil {
 		log.Printf("[TradeMonitor] handleMessage json.Unmarshal error: %v", err)
 		return
 	}
+	// log.Printf("wsTrade: %+v", wsTrade)
 
 	baseFill := Fill{
 		FillID:   wsTrade.Id,
 		MarketID: wsTrade.Market,
-		Time:     wsTrade.Matchtime,
+		Status:   wsTrade.Status,
+		Time:     wsTrade.Timestamp,
 	}
 
 	// taker
