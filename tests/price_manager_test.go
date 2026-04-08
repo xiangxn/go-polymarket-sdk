@@ -18,7 +18,7 @@ func TestPriceManager(t *testing.T) {
 	log.Printf("privateKey: %s", privateKey)
 	polymarketClient := polymarket.NewClient(privateKey, config)
 	for {
-		marketSlug := fmt.Sprintf("eth-updown-15m-%d", utils.RoundTo15Minutes())
+		marketSlug := fmt.Sprintf("eth-updown-15m-%d", utils.RoundToMinutes(15))
 		log.Printf("%s/markets/slug/%s", config.Polymarket.GammaBaseURL, marketSlug)
 
 		market, err := polymarketClient.FetchMarketBySlug(marketSlug)

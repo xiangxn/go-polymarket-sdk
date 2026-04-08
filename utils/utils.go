@@ -22,7 +22,7 @@ func ToTimestamp(dateStr string) (int64, error) {
 }
 
 // RoundTo15Minutes 将时间向下舍入到最近的15分钟边界，返回Unix时间戳（秒）
-func RoundTo15Minutes(date ...time.Time) int64 {
+func RoundToMinutes(m int, date ...time.Time) int64 {
 	var d time.Time
 	if len(date) == 0 {
 		d = time.Now()
@@ -31,7 +31,7 @@ func RoundTo15Minutes(date ...time.Time) int64 {
 	}
 
 	minutes := d.Minute()
-	floored := (minutes / 15) * 15
+	floored := (minutes / m) * m
 
 	rounded := time.Date(d.Year(), d.Month(), d.Day(), d.Hour(), floored, 0, 0, d.Location())
 	return rounded.Unix()
