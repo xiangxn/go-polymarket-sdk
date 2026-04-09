@@ -251,6 +251,6 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("redeem: %+v", resp)
+	log.Printf("[RelayClient] Redeem: %+v", resp)
 	return metadatas, nil
 }
