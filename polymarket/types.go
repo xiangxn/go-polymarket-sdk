@@ -52,9 +52,9 @@ type BookParams struct {
 // PriceData 表示价格数据,这个数据中的(MinOrderSize,TickSize,NegRisk)只在rest api中返回,ws api不返回
 type PriceData struct {
 	TokenID   string       `json:"tokenId"`
+	Market    string       `json:"market"`
 	BestAsk   *orders.Book `json:"bestAsk,omitempty"`
 	BestBid   *orders.Book `json:"bestBid,omitempty"`
-	Market    string       `json:"market"`
 	Timestamp int64        `json:"timestamp"`
 
 	MinOrderSize float64 `json:"min_order_size"`
