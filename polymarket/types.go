@@ -36,6 +36,14 @@ type OrderBookSummary struct {
 	Hash         string        `json:"hash"`
 }
 
+type OrderBook struct {
+	Market    string        `json:"market"`
+	AssetId   string        `json:"asset_id"`
+	Timestamp int64         `json:"timestamp"`
+	Bids      []orders.Book `json:"bids"`
+	Asks      []orders.Book `json:"asks"`
+}
+
 type BookParams struct {
 	TokenId string           `json:"token_id"`
 	Side    *orders.SideType `json:"side,omitempty"`
