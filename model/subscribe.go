@@ -25,7 +25,7 @@ type WSOrder struct {
 	Id              string   `json:"id"`
 	Market          string   `json:"market"`
 	OrderOwner      string   `json:"order_owner"`
-	OriginalSize    string   `json:"original_size"`
+	OriginalSize    float64  `json:"original_size,string"`
 	Outcome         string   `json:"outcome"`
 	Owner           string   `json:"owner"`
 	Price           float64  `json:"price,string"`
@@ -33,6 +33,7 @@ type WSOrder struct {
 	SizeMatched     float64  `json:"size_matched,string"`
 	Timestamp       int64    `json:"timestamp,string"`
 	Type            string   `json:"type"`
+	Status          string   `json:"status"`
 }
 
 type WSMakerOrder struct {

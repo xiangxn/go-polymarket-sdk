@@ -147,18 +147,7 @@ func (tm *TradeMonitor) emitFill(fill Fill) {
 	}
 }
 
-func (tm *TradeMonitor) handleMessage(msg []byte) {
-	defer func() {
-		if r := recover(); r != nil {
-			log.Printf("[TradeMonitor] handleMessage panic: %v", r)
-		}
-	}()
-
-	eventType := gjson.GetBytes(msg, "event_type").String()
-	if eventType != "trade" {
-		return
-	}
-
+func (tm *TradeMonitor) procTrade(msg []byte) {
 	if tm.subscribeTradeStatus != "ALL" {
 		eventStatus := gjson.GetBytes(msg, "status").String()
 		if eventStatus != tm.subscribeTradeStatus {
@@ -214,6 +203,51 @@ func (tm *TradeMonitor) handleMessage(msg []byte) {
 		fill.Price = mo.Price
 		fill.Size = mo.MatchedAmount
 		fill.Fee = mo.FeeRateBps * mo.MatchedAmount * mo.Price
+		tm.emitFill(fill)
+	}
+}
+
+func (tm *TradeMonitor) handleMessage(msg []byte) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[TradeMonitor] handleMessage panic: %v", r)
+		}
+	}()
+
+	eventType := gjson.GetBytes(msg, "event_type").String()
+	if eventType == "trade" {
+		tm.procTrade(msg)
+	} else if eventType == "order" {
+		tm.procOrder(msg)
+	}
+
+}
+
+func (tm *TradeMonitor) procOrder(msg []byte) {
+	var wsOrder sdkModel.WSOrder
+	if err := json.Unmarshal(msg, &wsOrder); err != nil {
+		log.Printf("[TradeMonitor] handleMessage json.Unmarshal error: %+v", err)
+		return
+	}
+
+	if tm.isTargetOwner(wsOrder.Owner) && wsOrder.Type == "CANCELLATION" {
+		baseFill := Fill{
+			FillID:   wsOrder.Id,
+			MarketID: wsOrder.Market,
+			Status:   wsOrder.Status,
+			Time:     wsOrder.Timestamp,
+		}
+		side := pmModel.BUY
+		if wsOrder.Side == string(orders.SELL) {
+			side = pmModel.SELL
+		}
+		fill := baseFill
+		fill.OrderID = wsOrder.Id
+		fill.TokenID = wsOrder.AssetId
+		fill.Side = side
+		fill.Price = wsOrder.Price
+		fill.Size = wsOrder.OriginalSize
+		fill.Fee = 0
 		tm.emitFill(fill)
 	}
 }
