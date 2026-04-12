@@ -16,9 +16,8 @@ func TestTradeMonitorHandleMessage_EmitsTakerAndMakerFills(t *testing.T) {
 		Passphrase: "",
 	}
 	tm := &TradeMonitor{
-		subscribeTradeStatus: "",
-		fillCh:               make(chan Fill, 10),
-		creds:                creds,
+		fillCh: make(chan Fill, 10),
+		creds:  creds,
 	}
 
 	msg := []byte(`{

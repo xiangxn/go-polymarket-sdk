@@ -36,22 +36,15 @@ type TradeMonitor struct {
 	ws             utils.WSClient
 	creds          *sdkModel.ApiKeyCreds
 	clobUserWSSURL string
-	// MATCHED, MINED, CONFIRMED
-	subscribeTradeStatus string // ALL, MATCHED, MINED, CONFIRMED
 
 	fillCh chan Fill
 }
 
-func NewTradeMonitor(wsBaseURL string, subscribeStatus string, creds *sdkModel.ApiKeyCreds) *TradeMonitor {
-	tradeStatus := "ALL"
-	if subscribeStatus != "" && subscribeStatus != tradeStatus {
-		tradeStatus = strings.ToUpper(subscribeStatus)
-	}
+func NewTradeMonitor(wsBaseURL string, creds *sdkModel.ApiKeyCreds) *TradeMonitor {
 	return &TradeMonitor{
-		creds:                creds,
-		clobUserWSSURL:       fmt.Sprintf("%s/ws/user", wsBaseURL),
-		subscribeTradeStatus: tradeStatus,
-		fillCh:               make(chan Fill, 4096),
+		creds:          creds,
+		clobUserWSSURL: fmt.Sprintf("%s/ws/user", wsBaseURL),
+		fillCh:         make(chan Fill, 4096),
 	}
 }
 
@@ -148,19 +141,17 @@ func (tm *TradeMonitor) emitFill(fill Fill) {
 }
 
 func (tm *TradeMonitor) procTrade(msg []byte) {
-	if tm.subscribeTradeStatus != "ALL" {
-		eventStatus := gjson.GetBytes(msg, "status").String()
-		if eventStatus != tm.subscribeTradeStatus {
-			return
-		}
-	}
-
+	// MATCHED, MINED, CONFIRMED, RETRYING, FAILED
 	var wsTrade sdkModel.WSTrade
 	if err := json.Unmarshal(msg, &wsTrade); err != nil {
 		log.Printf("[TradeMonitor] handleMessage json.Unmarshal error: %v", err)
 		return
 	}
 	// log.Printf("wsTrade: %+v", wsTrade)
+
+	if wsTrade.Status != "MINED" && wsTrade.Status != "FAILED" {
+		return
+	}
 
 	baseFill := Fill{
 		FillID:   wsTrade.Id,
