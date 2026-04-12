@@ -9,6 +9,7 @@ import (
 	"log"
 	"maps"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -57,6 +58,9 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 
 	if cfg.HttpTimeout > 0 {
 		client.SetTimeout(cfg.HttpTimeout)
+	}
+	if strings.HasPrefix(signerKey, "0x") {
+		signerKey = signerKey[2:]
 	}
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
