@@ -33,7 +33,7 @@ func TestTradeMonitorLive_FromDotEnv(t *testing.T) {
 		t.Skip("skip live test: CLOB_API_KEY/CLOB_SECRET/CLOB_PASSPHRASE is not fully set")
 	}
 
-	tm := polymarket.NewTradeMonitor(wsURL, "MINED", creds)
+	tm := polymarket.NewTradeMonitor(wsURL, creds)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 480*time.Second)
 	defer cancel()

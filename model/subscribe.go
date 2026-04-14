@@ -33,7 +33,8 @@ type WSOrder struct {
 	SizeMatched     float64  `json:"size_matched,string"`
 	Timestamp       int64    `json:"timestamp,string"`
 	Type            string   `json:"type"`
-	Status          string   `json:"status"`
+	// 'LIVE', 'MATCHED', 'CANCELED'
+	Status string `json:"status"`
 }
 
 type WSMakerOrder struct {
@@ -48,22 +49,23 @@ type WSMakerOrder struct {
 }
 
 type WSTrade struct {
-	AssetId      string         `json:"asset_id"`
-	EventType    string         `json:"event_type"`
-	Id           string         `json:"id"`
-	LastUpdate   int64          `json:"last_update,string"`
-	MakerOrders  []WSMakerOrder `json:"maker_orders"`
-	Market       string         `json:"market"`
-	Matchtime    int64          `json:"matchtime,string"`
-	Outcome      string         `json:"outcome"`
-	Owner        string         `json:"owner"`
-	Price        float64        `json:"price,string"`
-	Side         string         `json:"side"`
-	Size         float64        `json:"size,string"`
-	FeeRateBps   float64        `json:"fee_rate_bps,string"`
-	Status       string         `json:"status"`
-	TakerOrderId string         `json:"taker_order_id"`
-	Timestamp    int64          `json:"timestamp,string"`
-	TradeOwner   string         `json:"trade_owner"`
-	Type         string         `json:"type"`
+	AssetId     string         `json:"asset_id"`
+	EventType   string         `json:"event_type"`
+	Id          string         `json:"id"`
+	LastUpdate  int64          `json:"last_update,string"`
+	MakerOrders []WSMakerOrder `json:"maker_orders"`
+	Market      string         `json:"market"`
+	Matchtime   int64          `json:"matchtime,string"`
+	Outcome     string         `json:"outcome"`
+	Owner       string         `json:"owner"`
+	Price       float64        `json:"price,string"`
+	Side        string         `json:"side"`
+	Size        float64        `json:"size,string"`
+	FeeRateBps  float64        `json:"fee_rate_bps,string"`
+	// MATCHED, MINED, CONFIRMED, RETRYING, FAILED
+	Status       string `json:"status"`
+	TakerOrderId string `json:"taker_order_id"`
+	Timestamp    int64  `json:"timestamp,string"`
+	TradeOwner   string `json:"trade_owner"`
+	Type         string `json:"type"`
 }

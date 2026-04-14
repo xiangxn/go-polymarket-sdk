@@ -225,7 +225,7 @@ func (tm *TradeMonitor) procOrder(msg []byte) {
 		baseFill := Fill{
 			FillID:   wsOrder.Id,
 			MarketID: wsOrder.Market,
-			Status:   wsOrder.Status,
+			Status:   wsOrder.Status, //'LIVE', 'MATCHED', 'CANCELED'
 			Time:     wsOrder.Timestamp,
 		}
 		side := pmModel.BUY
