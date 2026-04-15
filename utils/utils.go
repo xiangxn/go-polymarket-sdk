@@ -158,3 +158,24 @@ func ToISOString(t time.Time) string {
 		Truncate(time.Millisecond).
 		Format("2006-01-02T15:04:05.000Z")
 }
+
+func Keys[K comparable, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func Map[T any, R any](in []T, fn func(T) R) []R {
+	out := make([]R, len(in))
+	for i, v := range in {
+		out[i] = fn(v)
+	}
+	return out
+}
+
+func TimeParse(timeStr string) time.Time {
+	t, _ := time.Parse(time.RFC3339, timeStr)
+	return t
+}
