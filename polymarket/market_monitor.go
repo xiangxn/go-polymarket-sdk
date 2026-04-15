@@ -25,13 +25,28 @@ type MarketMonitor struct {
 	subsTokens       []string
 	muSubsTokens     sync.RWMutex
 	pmClient         *PolymarketClient
+
+	orderBookCh chan OrderBook
 }
 
 func NewPolymarketData(wsBaseUrl string, client *PolymarketClient) *MarketMonitor {
 	return &MarketMonitor{
 		orderBooks:       make(map[string]*OrderBook),
+		orderBookCh:      make(chan OrderBook, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
+	}
+}
+
+func (mm *MarketMonitor) Subscribe() <-chan OrderBook {
+	return mm.orderBookCh
+}
+
+func (mm *MarketMonitor) emitOrderBook(orderBook OrderBook) {
+	select {
+	case mm.orderBookCh <- orderBook:
+	default:
+		log.Println("[MarketMonitor] fill channel full, dropping fill")
 	}
 }
 
@@ -94,21 +109,21 @@ func (pm *MarketMonitor) handleMessage(msg string) {
 		book.Asks = append(book.Asks, orders.Book{Price: price, Size: size})
 	}
 
-	var bestBid, bestAsk orders.Book
-	if len(bids) > 0 {
-		// lastBid := Bids[len(Bids)-1]
-		lastBid := slices.MaxFunc(bids, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
-		bestBid.Price = lastBid.Get("price").Float()
-		bestBid.Size = lastBid.Get("size").Float()
-	}
-	if len(asks) > 0 {
-		// lastAsk := Asks[len(Asks)-1]
-		lastAsk := slices.MinFunc(asks, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
-		bestAsk.Price = lastAsk.Get("price").Float()
-		bestAsk.Size = lastAsk.Get("size").Float()
-	}
+	// var bestBid, bestAsk orders.Book
+	// if len(bids) > 0 {
+	// 	// lastBid := Bids[len(Bids)-1]
+	// 	lastBid := slices.MaxFunc(bids, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
+	// 	bestBid.Price = lastBid.Get("price").Float()
+	// 	bestBid.Size = lastBid.Get("size").Float()
+	// }
+	// if len(asks) > 0 {
+	// 	// lastAsk := Asks[len(Asks)-1]
+	// 	lastAsk := slices.MinFunc(asks, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
+	// 	bestAsk.Price = lastAsk.Get("price").Float()
+	// 	bestAsk.Size = lastAsk.Get("size").Float()
+	// }
 	pm.updateOrderBook(&book)
-
+	pm.emitOrderBook(book)
 }
 
 // Disconnect 断开 WS

@@ -38,7 +38,7 @@ type CryptoPriceMonitor struct {
 	priceCh chan ExternalPrice
 }
 
-func NewExternalPriceData(pmClient *PolymarketClient, symbols ...string) *CryptoPriceMonitor {
+func NewCryptoPriceMonitor(pmClient *PolymarketClient, symbols ...string) *CryptoPriceMonitor {
 	symbolBinances := utils.Map(symbols, func(symbol string) string {
 		return fmt.Sprintf("{\"symbol\":\"%s%s\"}", strings.ToLower(symbol), SYMBOL_SUFFIX_BINANCE)
 	})
