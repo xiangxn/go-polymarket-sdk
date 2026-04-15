@@ -29,7 +29,7 @@ type MarketMonitor struct {
 	orderBookCh chan OrderBook
 }
 
-func NewPolymarketData(wsBaseUrl string, client *PolymarketClient) *MarketMonitor {
+func NewMarketMonitor(wsBaseUrl string, client *PolymarketClient) *MarketMonitor {
 	return &MarketMonitor{
 		orderBooks:       make(map[string]*OrderBook),
 		orderBookCh:      make(chan OrderBook, 4096),
