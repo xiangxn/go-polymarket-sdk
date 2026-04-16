@@ -126,12 +126,34 @@ func StringPtr(s string) *string {
 }
 
 func GetStringArray(obj *gjson.Result, path string) []string {
-	arr := obj.Get(path).Array()
+	var arr []gjson.Result
+	tmp := obj.Get(path)
+	if tmp.IsArray() {
+		arr = tmp.Array()
+	} else if tmp.Type == gjson.String {
+		arr = gjson.Parse(tmp.String()).Array()
+	} else {
+		return nil
+	}
 	res := make([]string, 0, len(arr))
 	for _, v := range arr {
 		res = append(res, v.String())
 	}
 	return res
+}
+
+func GetFloatArray(obj *gjson.Result, path string) []float64 {
+	strArr := GetStringArray(obj, path)
+	if len(strArr) == 0 {
+		return nil
+	}
+	return Map(strArr, func(item string) float64 {
+		f, err := strconv.ParseFloat(item, 64)
+		if err != nil {
+			return 0
+		}
+		return f
+	})
 }
 
 func SleepWithCtx(ctx context.Context, d time.Duration) bool {
