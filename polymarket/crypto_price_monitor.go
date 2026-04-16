@@ -16,6 +16,14 @@ import (
 const SYMBOL_SUFFIX_BINANCE = "usdt"
 const SYMBOL_SUFFIX_CHAINLINK = "/usd"
 
+type MonitorType string
+
+const (
+	MonitorAll       MonitorType = "ALL"
+	MonitorBinance   MonitorType = "BINANCE"
+	MonitorChainlink MonitorType = "CHAINLINK"
+)
+
 type ExternalPrice struct {
 	Symbol    string
 	Price     float64
@@ -38,7 +46,7 @@ type CryptoPriceMonitor struct {
 	priceCh chan ExternalPrice
 }
 
-func NewCryptoPriceMonitor(pmClient *PolymarketClient, symbols ...string) *CryptoPriceMonitor {
+func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, symbols ...string) *CryptoPriceMonitor {
 	symbolBinances := utils.Map(symbols, func(symbol string) string {
 		return fmt.Sprintf("{\"symbol\":\"%s%s\"}", strings.ToLower(symbol), SYMBOL_SUFFIX_BINANCE)
 	})
@@ -54,23 +62,29 @@ func NewCryptoPriceMonitor(pmClient *PolymarketClient, symbols ...string) *Crypt
 		sc = fmt.Sprintf("[%s]", strings.Join(symbolChainlink, ","))
 	}
 
-	return &CryptoPriceMonitor{
+	cpm := CryptoPriceMonitor{
 		pmClient:        pmClient,
 		priceCh:         make(chan ExternalPrice, 4096),
 		binancePrices:   make(map[string]float64),
 		chainlinkPrices: make(map[string]float64),
-		subscriptions: []map[string]any{
-			{
-				"topic":   "crypto_prices",
-				"type":    "update",
-				"filters": sb,
-			},
-			{
-				"topic":   "crypto_prices_chainlink",
-				"type":    "update",
-				"filters": sc,
-			}},
+		subscriptions:   []map[string]any{},
 	}
+	if monitorType == MonitorAll || monitorType == MonitorBinance {
+		cpm.subscriptions = append(cpm.subscriptions, map[string]any{
+			"topic":   "crypto_prices",
+			"type":    "update",
+			"filters": sb,
+		})
+	}
+	if monitorType == MonitorAll || monitorType == MonitorChainlink {
+		cpm.subscriptions = append(cpm.subscriptions, map[string]any{
+			"topic":   "crypto_prices_chainlink",
+			"type":    "update",
+			"filters": sc,
+		})
+	}
+
+	return &cpm
 }
 
 func (ep *CryptoPriceMonitor) Subscribe() <-chan ExternalPrice {
