@@ -8,43 +8,45 @@ import (
 	"strings"
 	"time"
 
-	pmModel "github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/tidwall/gjson"
 	sdkModel "github.com/xiangxn/go-polymarket-sdk/model"
-	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
-// Fill 表示一笔成交明细
-type Fill struct {
-	FillID   string // 平台返回的 trade id
-	OrderID  string
-	MarketID string
-	TokenID  string
-	Status   string
+type TradeEventType string
 
-	Side  pmModel.Side
-	Price float64
-	Size  float64
+const (
+	TradeEventTypeTrade   TradeEventType = "trade"
+	TradeEventTypeOrder   TradeEventType = "order"
+	TradeEventTypeUnknown TradeEventType = "unknown"
+)
 
-	Fee  float64
-	Time int64
+type TradeEvent struct {
+	EventType  TradeEventType
+	ReceivedAt int64
+	Raw        json.RawMessage
+
+	Trade *sdkModel.WSTrade
+	Order *sdkModel.WSOrder
+
+	ParseErr error
 }
 
-// TradeMonitor 监听用户成交事件
+// TradeMonitor 监听用户交易相关事件
+// 对齐官方 user channel：全量透传 trade/order 事件，不做状态过滤。
 type TradeMonitor struct {
 	ws             utils.WSClient
 	creds          *sdkModel.ApiKeyCreds
 	clobUserWSSURL string
 
-	fillCh chan Fill
+	eventCh chan TradeEvent
 }
 
 func NewTradeMonitor(wsBaseURL string, creds *sdkModel.ApiKeyCreds) *TradeMonitor {
 	return &TradeMonitor{
 		creds:          creds,
 		clobUserWSSURL: fmt.Sprintf("%s/ws/user", wsBaseURL),
-		fillCh:         make(chan Fill, 4096),
+		eventCh:        make(chan TradeEvent, 4096),
 	}
 }
 
@@ -66,8 +68,8 @@ func (tm *TradeMonitor) Run(ctx context.Context) error {
 	return tm.ws.Run(ctx)
 }
 
-func (tm *TradeMonitor) Subscribe() <-chan Fill {
-	return tm.fillCh
+func (tm *TradeMonitor) SubscribeEvents() <-chan TradeEvent {
+	return tm.eventCh
 }
 
 func (tm *TradeMonitor) Close() error {
@@ -95,20 +97,23 @@ func (tm *TradeMonitor) OnClose() {
 }
 
 func (tm *TradeMonitor) OnMessage(msg []byte) {
-	if string(msg) != "PONG" {
-		tm.handleMessage(msg)
+	if isHeartbeatMessage(msg) {
+		return
 	}
+	tm.handleMessage(msg)
 }
 
-func (tm *TradeMonitor) subscribeUserTrade() {
+func (tm *TradeMonitor) subscribeUserTrade(markets ...string) {
 	if tm.ws == nil || !tm.ws.IsAlive() {
 		return
 	}
 
-	subscribeMessage := sdkModel.SubscribeUserMessage{
-		Type:    "user",
-		Markets: []string{},
-		Auth:    tm.getAuth(),
+	subscribeMessage := map[string]any{
+		"type": "user",
+		"auth": tm.getAuth(),
+	}
+	if len(markets) > 0 {
+		subscribeMessage["markets"] = markets
 	}
 
 	data, _ := json.Marshal(subscribeMessage)
@@ -128,74 +133,32 @@ func (tm *TradeMonitor) getAuth() *sdkModel.WSUserAuth {
 	}
 }
 
-func (tm *TradeMonitor) isTargetOwner(owner string) bool {
-	return strings.EqualFold(owner, tm.creds.Key)
-}
-
-func (tm *TradeMonitor) emitFill(fill Fill) {
+func (tm *TradeMonitor) emitEvent(ev TradeEvent) {
 	select {
-	case tm.fillCh <- fill:
+	case tm.eventCh <- ev:
 	default:
-		log.Println("[TradeMonitor] fill channel full, dropping fill")
+		log.Println("[TradeMonitor] event channel full, dropping event")
 	}
 }
 
 func (tm *TradeMonitor) procTrade(msg []byte) {
-	// MATCHED, MINED, CONFIRMED, RETRYING, FAILED
 	var wsTrade sdkModel.WSTrade
 	if err := json.Unmarshal(msg, &wsTrade); err != nil {
-		log.Printf("[TradeMonitor] handleMessage json.Unmarshal error: %v", err)
+		tm.emitEvent(TradeEvent{
+			EventType:  TradeEventTypeTrade,
+			ReceivedAt: time.Now().UnixMilli(),
+			Raw:        append([]byte(nil), msg...),
+			ParseErr:   err,
+		})
 		return
 	}
-	// log.Printf("wsTrade: %+v", wsTrade)
 
-	if wsTrade.Status != "MINED" && wsTrade.Status != "FAILED" {
-		return
-	}
-
-	baseFill := Fill{
-		FillID:   wsTrade.Id,
-		MarketID: wsTrade.Market,
-		Status:   wsTrade.Status,
-		Time:     wsTrade.Timestamp,
-	}
-
-	// taker
-	if tm.isTargetOwner(wsTrade.Owner) {
-		side := pmModel.BUY
-		if wsTrade.Side == string(orders.SELL) {
-			side = pmModel.SELL
-		}
-
-		fill := baseFill
-		fill.OrderID = wsTrade.TakerOrderId
-		fill.TokenID = wsTrade.AssetId
-		fill.Side = side
-		fill.Price = wsTrade.Price
-		fill.Size = wsTrade.Size
-		fill.Fee = wsTrade.FeeRateBps * wsTrade.Size * wsTrade.Price
-		tm.emitFill(fill)
-	}
-
-	// maker
-	for _, mo := range wsTrade.MakerOrders {
-		if !tm.isTargetOwner(mo.Owner) {
-			continue
-		}
-		side := pmModel.BUY
-		if mo.Side == string(orders.SELL) {
-			side = pmModel.SELL
-		}
-
-		fill := baseFill
-		fill.OrderID = mo.OrderId
-		fill.TokenID = mo.AssetId
-		fill.Side = side
-		fill.Price = mo.Price
-		fill.Size = mo.MatchedAmount
-		fill.Fee = mo.FeeRateBps * mo.MatchedAmount * mo.Price
-		tm.emitFill(fill)
-	}
+	tm.emitEvent(TradeEvent{
+		EventType:  TradeEventTypeTrade,
+		ReceivedAt: time.Now().UnixMilli(),
+		Raw:        append([]byte(nil), msg...),
+		Trade:      &wsTrade,
+	})
 }
 
 func (tm *TradeMonitor) handleMessage(msg []byte) {
@@ -206,39 +169,41 @@ func (tm *TradeMonitor) handleMessage(msg []byte) {
 	}()
 
 	eventType := gjson.GetBytes(msg, "event_type").String()
-	if eventType == "trade" {
+	switch eventType {
+	case string(TradeEventTypeTrade):
 		tm.procTrade(msg)
-	} else if eventType == "order" {
+	case string(TradeEventTypeOrder):
 		tm.procOrder(msg)
+	default:
+		tm.emitEvent(TradeEvent{
+			EventType:  TradeEventTypeUnknown,
+			ReceivedAt: time.Now().UnixMilli(),
+			Raw:        append([]byte(nil), msg...),
+		})
 	}
-
 }
 
 func (tm *TradeMonitor) procOrder(msg []byte) {
 	var wsOrder sdkModel.WSOrder
 	if err := json.Unmarshal(msg, &wsOrder); err != nil {
-		log.Printf("[TradeMonitor] handleMessage json.Unmarshal error: %+v", err)
+		tm.emitEvent(TradeEvent{
+			EventType:  TradeEventTypeOrder,
+			ReceivedAt: time.Now().UnixMilli(),
+			Raw:        append([]byte(nil), msg...),
+			ParseErr:   err,
+		})
 		return
 	}
 
-	if tm.isTargetOwner(wsOrder.Owner) && wsOrder.Type == "CANCELLATION" {
-		baseFill := Fill{
-			FillID:   wsOrder.Id,
-			MarketID: wsOrder.Market,
-			Status:   wsOrder.Status, //'LIVE', 'MATCHED', 'CANCELED'
-			Time:     wsOrder.Timestamp,
-		}
-		side := pmModel.BUY
-		if wsOrder.Side == string(orders.SELL) {
-			side = pmModel.SELL
-		}
-		fill := baseFill
-		fill.OrderID = wsOrder.Id
-		fill.TokenID = wsOrder.AssetId
-		fill.Side = side
-		fill.Price = wsOrder.Price
-		fill.Size = wsOrder.OriginalSize
-		fill.Fee = 0
-		tm.emitFill(fill)
-	}
+	tm.emitEvent(TradeEvent{
+		EventType:  TradeEventTypeOrder,
+		ReceivedAt: time.Now().UnixMilli(),
+		Raw:        append([]byte(nil), msg...),
+		Order:      &wsOrder,
+	})
+}
+
+func isHeartbeatMessage(msg []byte) bool {
+	trimmed := strings.TrimSpace(string(msg))
+	return trimmed == "" || trimmed == "PONG" || trimmed == "{}"
 }

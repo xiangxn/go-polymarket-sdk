@@ -1,116 +1,172 @@
 package polymarket
 
 import (
-	"math"
 	"testing"
 	"time"
-
-	pmModel "github.com/polymarket/go-order-utils/pkg/model"
-	sdkModel "github.com/xiangxn/go-polymarket-sdk/model"
 )
 
-func TestTradeMonitorHandleMessage_EmitsTakerAndMakerFills(t *testing.T) {
-	creds := &sdkModel.ApiKeyCreds{
-		Key:        "614db9ff-874b-581b-60b3-e264e5fa4802",
-		Secret:     "",
-		Passphrase: "",
-	}
-	tm := &TradeMonitor{
-		fillCh: make(chan Fill, 10),
-		creds:  creds,
+func TestTradeMonitorHandleMessage_TradeAllStatusEmitted(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 10)}
+
+	statuses := []string{"MATCHED", "MINED", "CONFIRMED", "RETRYING", "FAILED"}
+	for i, status := range statuses {
+		msg := []byte(`{
+			"event_type":"trade",
+			"id":"trade-` + status + `",
+			"market":"mkt-1",
+			"asset_id":"token-1",
+			"price":"0.5",
+			"size":"2",
+			"fee_rate_bps":"0.02",
+			"side":"BUY",
+			"owner":"owner-1",
+			"status":"` + status + `",
+			"timestamp":"171000000` + string(rune('0'+i)) + `",
+			"maker_orders":[]
+		}`)
+		tm.handleMessage(msg)
 	}
 
+	for _, status := range statuses {
+		ev := mustRecvTradeEvent(t, tm.eventCh)
+		if ev.EventType != TradeEventTypeTrade {
+			t.Fatalf("unexpected event type: %v", ev.EventType)
+		}
+		if ev.ParseErr != nil {
+			t.Fatalf("unexpected parse error: %v", ev.ParseErr)
+		}
+		if ev.Trade == nil {
+			t.Fatal("trade payload should not be nil")
+		}
+		if ev.Trade.Status != status {
+			t.Fatalf("unexpected trade status: got=%s want=%s", ev.Trade.Status, status)
+		}
+	}
+}
+
+func TestTradeMonitorHandleMessage_OrderEventEmitted(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 1)}
+
 	msg := []byte(`{
-		"event_type":"trade",
-		"id":"fill-1",
+		"event_type":"order",
+		"id":"order-1",
 		"market":"mkt-1",
-		"matchtime":"1710000000",
-		"owner":"614db9ff-874b-581b-60b3-e264e5fa4802",
-		"side":"SELL",
-		"asset_id":"token-taker",
-		"price":"0.4",
-		"size":"5",
-		"fee_rate_bps":"0.02",
-		"taker_order_id":"order-taker",
-		"maker_orders":[
-			{
-				"owner":"614db9ff-874b-581b-60b3-e264e5fa4802",
-				"side":"BUY",
-				"order_id":"order-maker-1",
-				"asset_id":"token-maker-1",
-				"price":"0.35",
-				"matched_amount":"2",
-				"fee_rate_bps":"0.01"
-			},
-			{
-				"owner":"0xdef",
-				"side":"SELL",
-				"order_id":"order-maker-2",
-				"asset_id":"token-maker-2",
-				"price":"0.9",
-				"matched_amount":"1",
-				"fee_rate_bps":"0.03"
-			}
-		]
+		"asset_id":"token-1",
+		"owner":"owner-1",
+		"side":"BUY",
+		"price":"0.42",
+		"original_size":"10",
+		"size_matched":"0",
+		"status":"LIVE",
+		"type":"PLACEMENT",
+		"timestamp":"1710000010"
 	}`)
 
 	tm.handleMessage(msg)
+	ev := mustRecvTradeEvent(t, tm.eventCh)
 
-	f1 := mustRecvFill(t, tm.fillCh)
-	f2 := mustRecvFill(t, tm.fillCh)
-
-	if f1.OrderID != "order-taker" || f1.TokenID != "token-taker" || f1.FillID != "fill-1" || f1.MarketID != "mkt-1" {
-		t.Fatalf("unexpected taker fill: %+v", f1)
+	if ev.EventType != TradeEventTypeOrder {
+		t.Fatalf("unexpected event type: %v", ev.EventType)
 	}
-	if f1.Side != pmModel.SELL {
-		t.Fatalf("expected taker side SELL, got %v", f1.Side)
+	if ev.ParseErr != nil {
+		t.Fatalf("unexpected parse error: %v", ev.ParseErr)
 	}
-	assertFloatEqual(t, f1.Price, 0.4)
-	assertFloatEqual(t, f1.Size, 5)
-	assertFloatEqual(t, f1.Fee, 0.02*5*0.4)
-
-	if f2.OrderID != "order-maker-1" || f2.TokenID != "token-maker-1" {
-		t.Fatalf("unexpected maker fill: %+v", f2)
+	if ev.Order == nil {
+		t.Fatal("order payload should not be nil")
 	}
-	if f2.Side != pmModel.BUY {
-		t.Fatalf("expected maker side BUY, got %v", f2.Side)
-	}
-	assertFloatEqual(t, f2.Price, 0.35)
-	assertFloatEqual(t, f2.Size, 2)
-	assertFloatEqual(t, f2.Fee, 0.01*2*0.35)
-
-	select {
-	case extra := <-tm.fillCh:
-		t.Fatalf("unexpected extra fill emitted: %+v", extra)
-	default:
+	if ev.Order.Type != "PLACEMENT" || ev.Order.Status != "LIVE" {
+		t.Fatalf("unexpected order payload: %+v", ev.Order)
 	}
 }
 
-func TestTradeMonitorHandleMessage_NonTradeIgnored(t *testing.T) {
-	tm := &TradeMonitor{fillCh: make(chan Fill, 1)}
-	tm.handleMessage([]byte(`{"event_type":"book"}`))
+func TestTradeMonitorHandleMessage_UnknownEventEmitted(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 1)}
 
-	select {
-	case f := <-tm.fillCh:
-		t.Fatalf("unexpected fill emitted: %+v", f)
-	default:
+	raw := []byte(`{"event_type":"book","market":"mkt-1"}`)
+	tm.handleMessage(raw)
+	ev := mustRecvTradeEvent(t, tm.eventCh)
+
+	if ev.EventType != TradeEventTypeUnknown {
+		t.Fatalf("unexpected event type: %v", ev.EventType)
+	}
+	if ev.ParseErr != nil {
+		t.Fatalf("unexpected parse error: %v", ev.ParseErr)
+	}
+	if string(ev.Raw) != string(raw) {
+		t.Fatalf("raw mismatch: got=%s want=%s", string(ev.Raw), string(raw))
 	}
 }
 
-func mustRecvFill(t *testing.T, ch <-chan Fill) Fill {
+func TestTradeMonitorOnMessage_HeartbeatIgnored(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 1)}
+
+	tm.OnMessage([]byte("PONG"))
+	tm.OnMessage([]byte("{}"))
+	tm.OnMessage([]byte("   "))
+
+	assertNoTradeEvent(t, tm.eventCh)
+}
+
+func TestTradeMonitorHandleMessage_TradeParseErrorEmitted(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 1)}
+
+	msg := []byte(`{
+		"event_type":"trade",
+		"id":"trade-err",
+		"price":"bad-number"
+	}`)
+	tm.handleMessage(msg)
+	ev := mustRecvTradeEvent(t, tm.eventCh)
+
+	if ev.EventType != TradeEventTypeTrade {
+		t.Fatalf("unexpected event type: %v", ev.EventType)
+	}
+	if ev.ParseErr == nil {
+		t.Fatal("expected parse error")
+	}
+	if ev.Trade != nil {
+		t.Fatal("trade payload should be nil when parse failed")
+	}
+}
+
+func TestTradeMonitorHandleMessage_OrderParseErrorEmitted(t *testing.T) {
+	tm := &TradeMonitor{eventCh: make(chan TradeEvent, 1)}
+
+	msg := []byte(`{
+		"event_type":"order",
+		"id":"order-err",
+		"price":"bad-number"
+	}`)
+	tm.handleMessage(msg)
+	ev := mustRecvTradeEvent(t, tm.eventCh)
+
+	if ev.EventType != TradeEventTypeOrder {
+		t.Fatalf("unexpected event type: %v", ev.EventType)
+	}
+	if ev.ParseErr == nil {
+		t.Fatal("expected parse error")
+	}
+	if ev.Order != nil {
+		t.Fatal("order payload should be nil when parse failed")
+	}
+}
+
+func mustRecvTradeEvent(t *testing.T, ch <-chan TradeEvent) TradeEvent {
 	t.Helper()
 	select {
-	case f := <-ch:
-		return f
+	case ev := <-ch:
+		return ev
 	case <-time.After(200 * time.Millisecond):
-		t.Fatal("timeout waiting for fill")
-		return Fill{}
+		t.Fatal("timeout waiting for trade event")
+		return TradeEvent{}
 	}
 }
 
-func assertFloatEqual(t *testing.T, got, want float64) {
+func assertNoTradeEvent(t *testing.T, ch <-chan TradeEvent) {
 	t.Helper()
-	if math.Abs(got-want) > 1e-12 {
-		t.Fatalf("float mismatch, got=%v want=%v", got, want)
+	select {
+	case ev := <-ch:
+		t.Fatalf("unexpected event emitted: %+v", ev)
+	default:
 	}
 }
