@@ -756,13 +756,17 @@ func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelP
 }
 
 func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool, limit int) (*gjson.Result, error) {
+	wallet := c.cfg.Polymarket.FunderAddress
+	if proxyWallet != "" {
+		wallet = proxyWallet
+	}
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.DataAPIBaseURL, "/positions")
 	params := map[string]string{
 		"sizeThreshold": "0",
 		"limit":         strconv.Itoa(limit),
 		"sortBy":        "TOKENS",
 		"sortDirection": "DESC",
-		"user":          proxyWallet,
+		"user":          wallet,
 	}
 	if redeemable {
 		params["redeemable"] = "true"
