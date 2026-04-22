@@ -600,7 +600,7 @@ func (c *PolymarketClient) GetOpenOrders(params *orders.OpenOrderParams, onlyFir
 				AssetId:         item.Get("asset_id").String(),
 				Side:            item.Get("side").String(),
 				OriginalSize:    item.Get("original_size").Float(),
-				SizeMatched:     item.Get("size_matched").String(),
+				SizeMatched:     item.Get("size_matched").Float(),
 				Price:           item.Get("price").Float(),
 				AssociateTrades: utils.GetStringArray(&item, "associate_trades"),
 				Outcome:         item.Get("outcome").String(),
