@@ -2,20 +2,19 @@
 package polymarket
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/xiangxn/go-polymarket-sdk/model"
 )
 
 type PolymarketConfig struct {
-	ChainID        *big.Int `mapstructure:"chain_id"`
-	FunderAddress  *string  `mapstructure:"funder_address"`
-	ClobBaseURL    string   `mapstructure:"clob_base_url"`
-	ClobWSBaseURL  string   `mapstructure:"clob_ws_base_url"`
-	GammaBaseURL   string   `mapstructure:"gamma_base_url"`
-	RelayerBaseURL string   `mapstructure:"relayer_base_url"`
-	DataAPIBaseURL string   `mapstructure:"data_api_base_url"`
+	ChainID        int64  `mapstructure:"chain_id"`
+	FunderAddress  string `mapstructure:"funder_address"`
+	ClobBaseURL    string `mapstructure:"clob_base_url"`
+	ClobWSBaseURL  string `mapstructure:"clob_ws_base_url"`
+	GammaBaseURL   string `mapstructure:"gamma_base_url"`
+	RelayerBaseURL string `mapstructure:"relayer_base_url"`
+	DataAPIBaseURL string `mapstructure:"data_api_base_url"`
 
 	CLOBCreds    *model.ApiKeyCreds `mapstructure:"clob_creds"`
 	BuilderCreds *model.ApiKeyCreds `mapstructure:"builder_creds"`

@@ -1,7 +1,6 @@
 package polymarket
 
 import (
-	"math/big"
 	"time"
 )
 
@@ -18,7 +17,7 @@ func DefaultConfig() *Config {
 		HttpTimeout: 10 * time.Second,
 		SocksProxy:  "",
 		Polymarket: PolymarketConfig{
-			ChainID:        big.NewInt(137),
+			ChainID:        137,
 			ClobBaseURL:    "https://clob.polymarket.com",
 			ClobWSBaseURL:  "wss://ws-subscriptions-clob.polymarket.com",
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
