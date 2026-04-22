@@ -10,6 +10,7 @@ import (
 	"maps"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -754,11 +755,11 @@ func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelP
 	return c.Del(url, nil, body, headers)
 }
 
-func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool) (*gjson.Result, error) {
+func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool, limit int) (*gjson.Result, error) {
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.DataAPIBaseURL, "/positions")
 	params := map[string]string{
 		"sizeThreshold": "0",
-		"limit":         "100",
+		"limit":         strconv.Itoa(limit),
 		"sortBy":        "TOKENS",
 		"sortDirection": "DESC",
 		"user":          proxyWallet,

@@ -23,7 +23,7 @@ func TestRedeem(t *testing.T) {
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	client := polymarket.NewClient(privateKey, config)
 
-	positions, err := client.SearchPositions(funderAddress, true)
+	positions, err := client.SearchPositions(funderAddress, true, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
