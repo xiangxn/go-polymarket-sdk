@@ -128,7 +128,7 @@ func (c *wsClient) Run(ctx context.Context) error {
 				c.callOnClose()
 				return ctx.Err()
 			}
-			log.Printf("[WSClient] Reconnecting for the %d3rd time...", retry)
+			log.Printf("[WSClient] Reconnecting for the %drd time...", retry)
 			continue
 		}
 
