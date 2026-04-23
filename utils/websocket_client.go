@@ -79,6 +79,9 @@ func NewWSClient(cfg WSConfig, handler WSHandler) WSClient {
 	if cfg.PongWait == 0 {
 		cfg.PongWait = 30 * time.Second
 	}
+	if cfg.HandshakeTimeout == 0 {
+		cfg.HandshakeTimeout = 20 * time.Second
+	}
 	if cfg.ReconnectDelay == 0 {
 		cfg.ReconnectDelay = 5 * time.Second
 	}
