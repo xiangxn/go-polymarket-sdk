@@ -23,6 +23,7 @@ type PolymarketConfig struct {
 type Config struct {
 	HttpTimeout time.Duration `mapstructure:"http_timeout"`
 	SocksProxy  string        `mapstructure:"socks_proxy"`
+	HttpDebug   bool          `mapstructure:"http_debug"`
 
 	Polymarket PolymarketConfig `mapstructure:"polymarket"`
 }

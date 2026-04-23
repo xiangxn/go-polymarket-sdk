@@ -16,6 +16,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		HttpTimeout: 10 * time.Second,
 		SocksProxy:  "",
+		HttpDebug:   false,
 		Polymarket: PolymarketConfig{
 			ChainID:        137,
 			ClobBaseURL:    "https://clob.polymarket.com",
