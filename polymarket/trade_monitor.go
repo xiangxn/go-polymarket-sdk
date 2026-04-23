@@ -85,6 +85,7 @@ func (tm *TradeMonitor) OnOpen() {
 }
 
 func (tm *TradeMonitor) OnReconnect() {
+	log.Println("[TradeMonitor] WebSocket Reconnect...")
 	tm.subscribeUserTrade()
 }
 
