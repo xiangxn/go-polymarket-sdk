@@ -123,7 +123,7 @@ func (c *PolymarketClient) Post(url string, body any, headers map[string]string)
 	}
 	Headers.OverloadHeaders(resty.MethodPost, headers)
 	request.SetHeaders(headers)
-	// request.SetDebug(true)
+	request.SetDebug(true)
 	resp, err := request.Post(url)
 	if err != nil {
 		return nil, err
@@ -527,7 +527,7 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 			maps.Copy(headers, builderHeaders)
 		}
 	}
-	log.Printf("处理时间: %d", time.Now().UnixMilli())
+	log.Printf("[PolymarketClient] PostOrders 处理时间: %d", time.Now().UnixMilli())
 	return c.Post(url, body, headers)
 }
 
