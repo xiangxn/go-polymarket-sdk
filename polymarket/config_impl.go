@@ -21,6 +21,7 @@ func DefaultConfig() *Config {
 			ChainID:        137,
 			ClobBaseURL:    "https://clob.polymarket.com",
 			ClobWSBaseURL:  "wss://ws-subscriptions-clob.polymarket.com",
+			LiveWSBaseURL:  "wss://ws-live-data.polymarket.com",
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
 			RelayerBaseURL: "https://relayer-v2.polymarket.com",
 			DataAPIBaseURL: "https://data-api.polymarket.com",

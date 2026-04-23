@@ -12,6 +12,7 @@ type PolymarketConfig struct {
 	FunderAddress  string `mapstructure:"funder_address"`
 	ClobBaseURL    string `mapstructure:"clob_base_url"`
 	ClobWSBaseURL  string `mapstructure:"clob_ws_base_url"`
+	LiveWSBaseURL  string `mapstructure:"live_ws_base_url"`
 	GammaBaseURL   string `mapstructure:"gamma_base_url"`
 	RelayerBaseURL string `mapstructure:"relayer_base_url"`
 	DataAPIBaseURL string `mapstructure:"data_api_base_url"`

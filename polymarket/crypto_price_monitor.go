@@ -100,7 +100,7 @@ func (ep *CryptoPriceMonitor) Run(ctx context.Context) error {
 	}
 
 	ep.ws = utils.NewWSClient(utils.WSConfig{
-		URL:          "wss://ws-live-data.polymarket.com",
+		URL:          ep.pmClient.cfg.Polymarket.LiveWSBaseURL,
 		PingInterval: 10 * time.Second,
 		Reconnect:    true,
 		MaxReconnect: 20,
