@@ -10,7 +10,7 @@ import (
 
 func TestGetApiKeys(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 
 	config.Polymarket.CLOBCreds = &model.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
@@ -18,7 +18,7 @@ func TestGetApiKeys(t *testing.T) {
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	result, err := client.GetApiKeys()
 	if err != nil {

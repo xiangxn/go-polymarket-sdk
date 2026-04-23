@@ -13,7 +13,8 @@ import (
 
 func TestCreateOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	client := polymarket.NewClient("95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11", config)
+	config.Polymarket.OwnerKey = "95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11"
+	client := polymarket.NewClient(config)
 
 	tickSize := orders.TickSize001
 	signatureType := model.POLY_PROXY
@@ -34,8 +35,8 @@ func TestCreateOrder(t *testing.T) {
 
 func TestCreateMarketOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
-	client := polymarket.NewClient(privateKey, config)
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	client := polymarket.NewClient(config)
 
 	tokenID := os.Getenv("TOKENID")
 
@@ -59,7 +60,7 @@ func TestCreateMarketOrder(t *testing.T) {
 // 这个测试会真实下单，请务必慎重
 func TestPlaceOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID2")
 
@@ -70,7 +71,7 @@ func TestPlaceOrder(t *testing.T) {
 	}
 	config.Polymarket.FunderAddress = funderAddress
 
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	tickSize := orders.TickSize001
 	signatureType := model.POLY_GNOSIS_SAFE
@@ -98,7 +99,7 @@ func TestPlaceOrder(t *testing.T) {
 
 func TestPlaceOrders(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID2")
 
@@ -109,7 +110,7 @@ func TestPlaceOrders(t *testing.T) {
 	}
 	config.Polymarket.FunderAddress = funderAddress
 
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	tickSize := orders.TickSize001
 	signatureType := model.POLY_GNOSIS_SAFE
@@ -160,14 +161,14 @@ func TestPlaceOrders(t *testing.T) {
 
 func TestCancelOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	orderID := os.Getenv("ORDERID")
 	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	log.Println("orderID: ", orderID)
 	result, err := client.CancelOrder(&orders.OrderPayload{OrderID: orderID})
@@ -179,14 +180,14 @@ func TestCancelOrder(t *testing.T) {
 
 func TestCancelOrders(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	orderID := os.Getenv("ORDERID")
 	config.Polymarket.CLOBCreds = &myModel.ApiKeyCreds{
 		Key:        os.Getenv("CLOB_API_KEY"),
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	log.Println("orderID: ", orderID)
 	result, err := client.CancelOrders([]string{orderID})
@@ -206,8 +207,8 @@ func TestPlaceMarketOrder(t *testing.T) {
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	config.Polymarket.FunderAddress = funderAddress
 
-	privateKey := os.Getenv("SIGNERKEY")
-	client := polymarket.NewClient(privateKey, config)
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	client := polymarket.NewClient(config)
 
 	tokenID := os.Getenv("TOKENID")
 
@@ -242,8 +243,8 @@ func TestGetOpenOrders(t *testing.T) {
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 
-	privateKey := os.Getenv("SIGNERKEY")
-	client := polymarket.NewClient(privateKey, config)
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	client := polymarket.NewClient(config)
 
 	result, err := client.GetOpenOrders(nil, true, nil)
 	if err != nil {

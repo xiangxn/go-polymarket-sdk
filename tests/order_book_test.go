@@ -11,8 +11,8 @@ import (
 
 func TestGetOrderBook(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
-	client := polymarket.NewClient(privateKey, config)
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	client := polymarket.NewClient(config)
 
 	tokenID := os.Getenv("TOKENID")
 	orderBook, err := client.GetOrderBook(tokenID)
@@ -25,10 +25,10 @@ func TestGetOrderBook(t *testing.T) {
 
 func TestGetOrderBooks(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	tokenID := os.Getenv("TOKENID")
 	tokenID2 := os.Getenv("TOKENID2")
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	side := orders.BUY
 	orderBooks, err := client.GetOrderBooks([]polymarket.BookParams{{

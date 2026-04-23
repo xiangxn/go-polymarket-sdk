@@ -38,7 +38,7 @@ type PolymarketClient struct {
 	muNegRisk   sync.RWMutex
 }
 
-func NewClient(signerKey string, cfg *Config) *PolymarketClient {
+func NewClient(cfg *Config) *PolymarketClient {
 	transport := &http.Transport{ // 打开 KeepAlive / 连接池
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 200,
@@ -61,9 +61,7 @@ func NewClient(signerKey string, cfg *Config) *PolymarketClient {
 	if cfg.HttpTimeout > 0 {
 		client.SetTimeout(cfg.HttpTimeout)
 	}
-	if strings.HasPrefix(signerKey, "0x") {
-		signerKey = signerKey[2:]
-	}
+	signerKey := strings.TrimPrefix(cfg.Polymarket.OwnerKey, "0x")
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
 		panic(err)

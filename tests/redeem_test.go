@@ -19,9 +19,9 @@ func TestRedeem(t *testing.T) {
 		Secret:     os.Getenv("BUILDER_SECRET"),
 		Passphrase: os.Getenv("BUILDER_PASSPHRASE"),
 	}
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	funderAddress := os.Getenv("FUNDERADDRESS")
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	positions, err := client.SearchPositions(funderAddress, true, 100)
 	if err != nil {
@@ -50,7 +50,7 @@ func TestRedeem(t *testing.T) {
 	// 	t.Log("no positions to redeem")
 	// 	return
 	// }
-	relayClient := builder.NewRelayClient(config.Polymarket.RelayerBaseURL, privateKey, 137, config.Polymarket.BuilderCreds, nil)
+	relayClient := builder.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil)
 	result, err := relayClient.RedeemBatch(conditionIds, negRisks, amounts, nil)
 	if err != nil {
 		t.Fatal(err)

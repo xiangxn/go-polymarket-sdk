@@ -11,8 +11,8 @@ import (
 
 func TestServerTime(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
-	client := polymarket.NewClient(privateKey, config)
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	client := polymarket.NewClient(config)
 
 	start := time.Now().Unix()
 	serverTime, err := client.GetServerTime()
@@ -28,9 +28,9 @@ func TestServerTime(t *testing.T) {
 
 func TestServerBookTime(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	privateKey := os.Getenv("SIGNERKEY")
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	tokenId := os.Getenv("TOKENID")
-	client := polymarket.NewClient(privateKey, config)
+	client := polymarket.NewClient(config)
 
 	start := time.Now().UnixMilli()
 	result, err := client.GetOrderBook(tokenId)

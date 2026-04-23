@@ -17,6 +17,7 @@ type PolymarketConfig struct {
 	RelayerBaseURL string `mapstructure:"relayer_base_url"`
 	DataAPIBaseURL string `mapstructure:"data_api_base_url"`
 
+	OwnerKey     string             `mapstructure:"owner_key"`
 	CLOBCreds    *model.ApiKeyCreds `mapstructure:"clob_creds"`
 	BuilderCreds *model.ApiKeyCreds `mapstructure:"builder_creds"`
 }

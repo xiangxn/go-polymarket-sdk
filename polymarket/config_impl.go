@@ -25,8 +25,10 @@ func DefaultConfig() *Config {
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
 			RelayerBaseURL: "https://relayer-v2.polymarket.com",
 			DataAPIBaseURL: "https://data-api.polymarket.com",
-			CLOBCreds:      nil,
-			BuilderCreds:   nil,
+
+			OwnerKey:     "1111111111111111111111111111111111111111111111111111111111111111",
+			CLOBCreds:    nil,
+			BuilderCreds: nil,
 		},
 	}
 }
