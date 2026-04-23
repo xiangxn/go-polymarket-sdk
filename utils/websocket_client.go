@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -127,6 +128,7 @@ func (c *wsClient) Run(ctx context.Context) error {
 				c.callOnClose()
 				return ctx.Err()
 			}
+			log.Printf("[WSClient] Reconnecting for the %d3rd time...", retry)
 			continue
 		}
 
