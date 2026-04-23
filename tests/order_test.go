@@ -68,7 +68,7 @@ func TestPlaceOrder(t *testing.T) {
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
-	config.Polymarket.FunderAddress = &funderAddress
+	config.Polymarket.FunderAddress = funderAddress
 
 	client := polymarket.NewClient(privateKey, config)
 
@@ -107,7 +107,7 @@ func TestPlaceOrders(t *testing.T) {
 		Secret:     os.Getenv("CLOB_SECRET"),
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
-	config.Polymarket.FunderAddress = &funderAddress
+	config.Polymarket.FunderAddress = funderAddress
 
 	client := polymarket.NewClient(privateKey, config)
 
@@ -204,7 +204,7 @@ func TestPlaceMarketOrder(t *testing.T) {
 		Passphrase: os.Getenv("CLOB_PASSPHRASE"),
 	}
 	funderAddress := os.Getenv("FUNDERADDRESS")
-	config.Polymarket.FunderAddress = &funderAddress
+	config.Polymarket.FunderAddress = funderAddress
 
 	privateKey := os.Getenv("SIGNERKEY")
 	client := polymarket.NewClient(privateKey, config)
