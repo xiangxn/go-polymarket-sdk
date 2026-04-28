@@ -1,6 +1,11 @@
 package orders
 
-import "strconv"
+import (
+	"crypto/rand"
+	"math"
+	"math/big"
+	"strconv"
+)
 
 func IsTickSizeSmaller(a TickSize, b TickSize) bool {
 	a1, err := strconv.ParseFloat(string(a), 64)
@@ -28,4 +33,10 @@ func ConvertTickSize(tickSize TickSize) float64 {
 		return 0
 	}
 	return tickSize1
+}
+
+func GenerateRandomSalt() int64 {
+	maxInt := math.Pow(2, 32)
+	nBig, _ := rand.Int(rand.Reader, big.NewInt(int64(maxInt)))
+	return nBig.Int64()
 }

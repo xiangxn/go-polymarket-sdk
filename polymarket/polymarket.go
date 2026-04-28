@@ -16,8 +16,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/polymarket/go-order-utils/pkg/builder"
-	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/tidwall/gjson"
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
@@ -322,7 +320,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 	return marketFeeRateBps, nil
 }
 
-func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
+func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orders.CreateOrderOptions) (*orders.SignedOrder, error) {
 	if c.cfg.Polymarket.ChainID == 0 {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -330,11 +328,6 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	if err != nil {
 		return nil, err
 	}
-	feeRateBps, err := c.ResolveFeeRateBps(userOrder.TokenID, userOrder.FeeRateBps)
-	if err != nil {
-		return nil, err
-	}
-	userOrder.FeeRateBps = &feeRateBps
 
 	if !orders.PriceValid(userOrder.Price, tickSize) {
 		return nil, fmt.Errorf("invalid price (%.4f), min: %s - max: %.4f", userOrder.Price, tickSize, 1-orders.ConvertTickSize(tickSize))
@@ -349,13 +342,13 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 		}
 	}
 
-	var nr model.VerifyingContract
+	var nr orders.VerifyingContract
 	if negRisk {
-		nr = model.NegRiskCTFExchange
+		nr = orders.NegRiskCTFExchange
 	} else {
-		nr = model.CTFExchange
+		nr = orders.CTFExchange
 	}
-	builder := builder.NewExchangeOrderBuilderImpl(big.NewInt(c.cfg.Polymarket.ChainID), nil)
+	builder := orders.NewOrderBuilderImpl(big.NewInt(c.cfg.Polymarket.ChainID), nil)
 
 	var maker string
 	if c.cfg.Polymarket.FunderAddress != "" {
@@ -363,7 +356,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	} else {
 		maker = c.signer.Address.String()
 	}
-	signatureType := model.EOA
+	signatureType := orders.EOA
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
@@ -378,7 +371,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	return order, nil
 }
 
-func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions) (*model.SignedOrder, error) {
+func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions) (*orders.SignedOrder, error) {
 	if c.cfg.Polymarket.ChainID == 0 {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -386,11 +379,6 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	if err != nil {
 		return nil, err
 	}
-	feeRateBps, err := c.ResolveFeeRateBps(userMarketOrder.TokenID, userMarketOrder.FeeRateBps) // 建议市场开始时就获取feeRateBps
-	if err != nil {
-		return nil, err
-	}
-	userMarketOrder.FeeRateBps = &feeRateBps
 
 	if userMarketOrder.Price == nil { // 尽量在外面计算价格
 		price, cErr := c.CalculateMarketPrice(userMarketOrder.TokenID, userMarketOrder.Side, userMarketOrder.Amount, userMarketOrder.OrderType)
@@ -413,21 +401,21 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 			return nil, err
 		}
 	}
-	var nr model.VerifyingContract
+	var nr orders.VerifyingContract
 	if negRisk {
-		nr = model.NegRiskCTFExchange
+		nr = orders.NegRiskCTFExchange
 	} else {
-		nr = model.CTFExchange
+		nr = orders.CTFExchange
 	}
 
-	builder := builder.NewExchangeOrderBuilderImpl(big.NewInt(c.cfg.Polymarket.ChainID), nil)
+	builder := orders.NewOrderBuilderImpl(big.NewInt(c.cfg.Polymarket.ChainID), nil)
 	var maker string
 	if c.cfg.Polymarket.FunderAddress != "" {
 		maker = c.cfg.Polymarket.FunderAddress
 	} else {
 		maker = c.signer.Address.String()
 	}
-	signatureType := model.EOA
+	signatureType := orders.EOA
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
@@ -442,13 +430,13 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	return order, nil
 }
 
-func (c *PolymarketClient) PostOrder(order *model.SignedOrder, orderType orders.OrderType, deferExec bool) (*gjson.Result, error) {
+func (c *PolymarketClient) PostOrder(order *orders.SignedOrder, orderType orders.OrderType, deferExec bool) (*gjson.Result, error) {
 	path := "/order"
 	if c.cfg.Polymarket.HasCLOBAuth() == false {
 		return nil, fmt.Errorf("creds cannot be empty")
 	}
 	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.ClobBaseURL, path)
-	orderPayload := orders.OrderToDTO(order, c.cfg.Polymarket.CLOBCreds.Key, orderType, deferExec)
+	orderPayload := orders.OrderToDTO(order, c.cfg.Polymarket.CLOBCreds.Key, orderType, deferExec, "0")
 
 	data, err := json.Marshal(orderPayload)
 	if err != nil {
@@ -505,7 +493,7 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 
 	var ordersPayload []orders.PostOrderDTO
 	for _, arg := range args {
-		orderPayload := orders.OrderToDTO(arg.Order, c.cfg.Polymarket.CLOBCreds.Key, arg.OrderType, deferExec)
+		orderPayload := orders.OrderToDTO(arg.Order, c.cfg.Polymarket.CLOBCreds.Key, arg.OrderType, deferExec, "0")
 		ordersPayload = append(ordersPayload, orderPayload)
 	}
 
@@ -720,12 +708,12 @@ func (c *PolymarketClient) GetServerTime() (int64, error) {
 	return result.Int(), nil
 }
 
-func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side model.Side, amount float64, orderType orders.MarketOrderType) (float64, error) {
+func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side orders.Side, amount float64, orderType orders.MarketOrderType) (float64, error) {
 	book, err := c.GetOrderBook(tokenID)
 	if err != nil {
 		return 0, fmt.Errorf("no orderbook")
 	}
-	if side == model.BUY {
+	if side == orders.BUY {
 		if book.Asks == nil {
 			return 0, fmt.Errorf("no match")
 		}

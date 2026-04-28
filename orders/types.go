@@ -1,9 +1,5 @@
 package orders
 
-import (
-	"github.com/polymarket/go-order-utils/pkg/model"
-)
-
 type MarketOrderType string
 
 const (
@@ -32,8 +28,8 @@ const (
 type SideType string
 
 const (
-	BUY  SideType = "BUY"
-	SELL SideType = "SELL"
+	POST_BUY  SideType = "BUY"
+	POST_SELL SideType = "SELL"
 )
 
 type PostOrderDTO struct {
@@ -44,20 +40,16 @@ type PostOrderDTO struct {
 }
 
 type PostOrdersArgs struct {
-	Order     *model.SignedOrder
+	Order     *SignedOrder
 	OrderType OrderType
 }
 
 type OrderDTO struct {
-	Salt int64 `json:"salt"`
-	// 订单的发起人，即订单的资金来源。
+	// Ethereum address of the maker (In the default case, this is your proxy address)
 	Maker string `json:"maker"`
 
 	// 订单签署人。此项为可选，若未填写，则签署人即为订单制作人。
 	Signer string `json:"signer"`
-
-	// 下单的地址。地址零表示公共订单。
-	Taker string `json:"taker"`
 
 	// 要买卖的 CTF ERC1155 资产的 Token ID。
 	// 如果是买入，则为要购买的资产的 Token ID，即 makerAssetId。
@@ -75,18 +67,23 @@ type OrderDTO struct {
 
 	// 订单过期的时间戳。
 	// 可选，如果未指定，则值为“0”（无过期时间）。
+	// Unix timestamp when the order expires. Present in the API wire body; not part of the CLOB V2 EIP-712 signed order struct.
 	Expiration string `json:"expiration"`
 
-	// 用于链上取消的随机数
-	Nonce string `json:"nonce"`
+	// Unix timestamp in milliseconds when the order was created (used for order uniqueness)
+	Timestamp string `json:"timestamp"`
 
-	// 手续费率（以基点计），向委托人收取，按交易额计算
-	FeeRateBps string `json:"feeRateBps"`
-
-	// 订单使用的签名类型。默认值为“EOA”。
-	SignatureType model.SignatureType `json:"signatureType"`
+	// Builder code (bytes32) for integrator attribution. 0x + 64 hex chars or empty.
+	Builder string `json:"builder"`
 
 	Signature string `json:"signature"`
+
+	Salt int64 `json:"salt"`
+
+	// 订单使用的签名类型。默认值为“EOA”。
+	SignatureType SignatureType `json:"signatureType"`
+
+	Metadata string `json:"metadata"`
 }
 
 type RoundConfig struct {
@@ -97,7 +94,7 @@ type RoundConfig struct {
 
 type CreateOrderOptions struct {
 	TickSize      *TickSize
-	SignatureType *model.SignatureType
+	SignatureType *SignatureType
 	NegRisk       *bool
 }
 
@@ -121,27 +118,22 @@ type UserOrder struct {
 	/**
 	 * Side of the order
 	 */
-	Side model.Side
+	Side Side
 
 	/**
-	 * Fee rate, in basis points, charged to the order maker, charged on proceeds
+	 * Metadata (bytes32)
 	 */
-	FeeRateBps *float64
+	Metadata *string
 
 	/**
-	 * Nonce used for onchain cancellations
+	 * Builder code (bytes32)
 	 */
-	Nonce *uint64
+	BuilderCode *string
 
 	/**
-	 * Timestamp after which the order is expired.
+	 * Expiration timestamp (unix seconds). Defaults to 0 (no expiration).
 	 */
-	Expiration *uint64
-
-	/**
-	 * Address of the order taker. The zero address is used to indicate a public order
-	 */
-	Taker *string
+	Expiration *string
 }
 
 type UserMarketOrder struct {
@@ -149,6 +141,12 @@ type UserMarketOrder struct {
 	 * TokenID of the Conditional token asset being traded
 	 */
 	TokenID string
+
+	/**
+	 * Price used to create the order
+	 * If it is not present the market price will be used.
+	 */
+	Price *float64
 
 	/**
 	 * BUY orders: $$$ Amount to buy
@@ -159,28 +157,7 @@ type UserMarketOrder struct {
 	/**
 	 * Side of the order
 	 */
-	Side model.Side
-
-	/**
-	 * Price used to create the order
-	 * If it is not present the market price will be used.
-	 */
-	Price *float64
-
-	/**
-	 * Fee rate, in basis points, charged to the order maker, charged on proceeds
-	 */
-	FeeRateBps *float64
-
-	/**
-	 * Nonce used for onchain cancellations
-	 */
-	Nonce *uint64
-
-	/**
-	 * Address of the order taker. The zero address is used to indicate a public order
-	 */
-	Taker *string
+	Side Side
 
 	/**
 	 * Specifies the type of order execution:
@@ -188,6 +165,23 @@ type UserMarketOrder struct {
 	 * - FAK (Fill and Kill): The order can be partially filled, and any unfilled portion is canceled.
 	 */
 	OrderType MarketOrderType
+
+	/**
+	 * User's USDC balance. If provided and sufficient to cover amount + fees, the order
+	 * amount is used as-is. Otherwise fees are deducted from the amount.
+	 * If this field is left empty, the default flow is to use the order amount as-is
+	 */
+	UserUSDCBalance *float64
+
+	/**
+	 * Metadata (bytes32)
+	 */
+	Metadata *string
+
+	/**
+	 * Builder code (bytes32)
+	 */
+	BuilderCode *string
 }
 
 type OrderPayload struct {

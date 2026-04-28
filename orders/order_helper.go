@@ -4,16 +4,16 @@ import (
 	"encoding/hex"
 	"fmt"
 	"strconv"
+	"time"
 
-	"github.com/polymarket/go-order-utils/pkg/model"
 	"github.com/xiangxn/go-polymarket-sdk/constants"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
-func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfig *RoundConfig) (model.Side, float64, float64) {
+func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *RoundConfig) (Side, float64, float64) {
 	rawPrice := utils.RoundNormal(price, roundConfig.Price)
 
-	if side == model.BUY {
+	if side == BUY {
 		// force 2 decimals places
 		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
 
@@ -22,7 +22,7 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
 
 		// log.Printf("rawMakerAmt: %f", rawMakerAmt)
-		return model.BUY, rawMakerAmt, rawTakerAmt
+		return BUY, rawMakerAmt, rawTakerAmt
 
 	} else {
 		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
@@ -30,28 +30,28 @@ func GetOrderRawAmounts(side model.Side, size float64, price float64, roundConfi
 		rawTakerAmt := rawMakerAmt * rawPrice
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
 
-		return model.SELL, rawMakerAmt, rawTakerAmt
+		return SELL, rawMakerAmt, rawTakerAmt
 	}
 }
 
-func GetMarketOrderRawAmounts(side model.Side, amount float64, price float64, roundConfig *RoundConfig) (model.Side, float64, float64) {
+func GetMarketOrderRawAmounts(side Side, amount float64, price float64, roundConfig *RoundConfig) (Side, float64, float64) {
 	// force 2 decimals places
 	rawPrice := utils.RoundDown(price, roundConfig.Price)
 
-	if side == model.BUY {
+	if side == BUY {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt / rawPrice
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-		return model.BUY, rawMakerAmt, rawTakerAmt
+		return BUY, rawMakerAmt, rawTakerAmt
 	} else {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt * rawPrice
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-		return model.SELL, rawMakerAmt, rawTakerAmt
+		return SELL, rawMakerAmt, rawTakerAmt
 	}
 }
 
-func BuildOrderCreationArgs(signer string, maker string, signatureType model.SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*model.OrderData, error) {
+func BuildOrderCreationArgs(signer string, maker string, signatureType SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*OrderData, error) {
 	side, rawMakerAmt, rawTakerAmt := GetOrderRawAmounts(userOrder.Side, userOrder.Size, userOrder.Price, roundConfig)
 	// log.Printf("BuildOrderCreationArgs rawMakerAmt: %f, rawTakerAmt: %f", rawMakerAmt, rawTakerAmt)
 	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
@@ -62,46 +62,25 @@ func BuildOrderCreationArgs(signer string, maker string, signatureType model.Sig
 	if err != nil {
 		return nil, err
 	}
-	var taker string
-	if userOrder.Taker != nil {
-		taker = *userOrder.Taker
-	} else {
-		taker = "0x0000000000000000000000000000000000000000"
-	}
-	var feeRateBps string
-	if userOrder.FeeRateBps != nil {
-		feeRateBps = utils.FloatToString(*userOrder.FeeRateBps, 0)
-	} else {
-		feeRateBps = "0"
-	}
-	var nonce string
-	if userOrder.Nonce != nil {
-		nonce = strconv.FormatUint(*userOrder.Nonce, 10)
-	} else {
-		nonce = "0"
-	}
-	var expiration string
-	if userOrder.Expiration != nil {
-		expiration = strconv.FormatUint(*userOrder.Expiration, 10)
-	} else {
-		expiration = "0"
-	}
-	return &model.OrderData{
-		Signer:        signer,
+
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+
+	return &OrderData{
 		Maker:         maker,
-		Taker:         taker,
-		SignatureType: signatureType,
 		TokenId:       userOrder.TokenID,
 		MakerAmount:   makerAmount.String(),
 		TakerAmount:   takerAmount.String(),
 		Side:          side,
-		FeeRateBps:    feeRateBps,
-		Expiration:    expiration,
-		Nonce:         nonce,
+		Signer:        &signer,
+		SignatureType: &signatureType,
+		Timestamp:     &timestamp,
+		Metadata:      userOrder.Metadata,
+		Builder:       userOrder.BuilderCode,
+		Expiration:    userOrder.Expiration,
 	}, nil
 }
 
-func BuildMarketOrderCreationArgs(signer string, maker string, signatureType model.SignatureType, userMarketOrder *UserMarketOrder, roundConfig *RoundConfig) (*model.OrderData, error) {
+func BuildMarketOrderCreationArgs(signer string, maker string, signatureType SignatureType, userMarketOrder *UserMarketOrder, roundConfig *RoundConfig) (*OrderData, error) {
 	var inputPrice float64
 	if userMarketOrder.Price != nil {
 		inputPrice = *userMarketOrder.Price
@@ -117,62 +96,49 @@ func BuildMarketOrderCreationArgs(signer string, maker string, signatureType mod
 	if err != nil {
 		return nil, err
 	}
-	var taker string
-	if userMarketOrder.Taker != nil {
-		taker = *userMarketOrder.Taker
-	} else {
-		taker = "0x0000000000000000000000000000000000000000"
-	}
-	var feeRateBps string
-	if userMarketOrder.FeeRateBps != nil {
-		feeRateBps = utils.FloatToString(*userMarketOrder.FeeRateBps, 0)
-	} else {
-		feeRateBps = "0"
-	}
-	var nonce string
-	if userMarketOrder.Nonce != nil {
-		nonce = strconv.FormatUint(*userMarketOrder.Nonce, 10)
-	} else {
-		nonce = "0"
-	}
-	return &model.OrderData{
-		Signer:        signer,
+
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+
+	expiration := "0"
+
+	return &OrderData{
 		Maker:         maker,
-		Taker:         taker,
-		SignatureType: signatureType,
 		TokenId:       userMarketOrder.TokenID,
 		MakerAmount:   makerAmount.String(),
 		TakerAmount:   takerAmount.String(),
 		Side:          side,
-		FeeRateBps:    feeRateBps,
-		Expiration:    "0",
-		Nonce:         nonce,
+		Signer:        &signer,
+		SignatureType: &signatureType,
+		Timestamp:     &timestamp,
+		Metadata:      userMarketOrder.Metadata,
+		Builder:       userMarketOrder.BuilderCode,
+		Expiration:    &expiration,
 	}, nil
 }
 
-func OrderToDTO(order *model.SignedOrder, owner string, orderType OrderType, deferExec bool) PostOrderDTO {
-	side := BUY
-	if order.Side.Int64() == int64(model.SELL) {
-		side = SELL
+func OrderToDTO(order *SignedOrder, owner string, orderType OrderType, deferExec bool, expiration string) PostOrderDTO {
+	side := POST_BUY
+	if order.Side.Int64() == int64(SELL) {
+		side = POST_SELL
 	} else {
-		side = BUY
+		side = POST_BUY
 	}
 	return PostOrderDTO{
 		DeferExec: deferExec,
 		Order: OrderDTO{
-			Salt:          order.Salt.Int64(),
 			Maker:         order.Maker.String(),
 			Signer:        order.Signer.String(),
-			Taker:         order.Taker.String(),
 			TokenId:       order.TokenId.String(),
 			MakerAmount:   order.MakerAmount.String(),
 			TakerAmount:   order.TakerAmount.String(),
-			Expiration:    order.Expiration.String(),
-			Nonce:         order.Nonce.String(),
-			FeeRateBps:    order.FeeRateBps.String(),
 			Side:          side,
-			SignatureType: model.SignatureType(order.SignatureType.Int64()),
+			Expiration:    expiration,
+			Timestamp:     order.Timestamp.String(),
+			Builder:       order.Builder.Hex(),
 			Signature:     "0x" + hex.EncodeToString(order.Signature),
+			Salt:          order.Salt.Int64(),
+			SignatureType: SignatureType(order.SignatureType.Int64()),
+			Metadata:      order.Metadata.Hex(),
 		},
 		Owner:     owner,
 		OrderType: orderType,
