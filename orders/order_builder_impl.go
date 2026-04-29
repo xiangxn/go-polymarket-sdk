@@ -104,7 +104,7 @@ func (e *OrderBuilderImpl) BuildOrder(orderData *OrderData) (*Order, error) {
 		timestamp = big.NewInt(time.Now().UnixMilli())
 	} else {
 		if timestamp, ok = new(big.Int).SetString(*orderData.Timestamp, 10); !ok {
-			return nil, fmt.Errorf("can't parse Timestamp: %s as valid *big.Int", orderData.Timestamp)
+			return nil, fmt.Errorf("can't parse Timestamp: %s as valid *big.Int", *orderData.Timestamp)
 		}
 	}
 
@@ -117,7 +117,7 @@ func (e *OrderBuilderImpl) BuildOrder(orderData *OrderData) (*Order, error) {
 
 	var builder common.Hash
 	if orderData.Builder == nil {
-		builder = common.Hash{}
+		builder = common.HexToHash("0x05218f8fe2ecac33c25ead880759a221303d7623f807be8b876a0bff9dd18b7c")
 	} else {
 		builder = common.HexToHash(*orderData.Builder)
 	}
@@ -153,7 +153,7 @@ func (e *OrderBuilderImpl) BuildOrderHash(order *Order, contract VerifyingContra
 		return OrderHash{}, err
 	}
 
-	values := []interface{}{
+	values := []any{
 		_ORDER_STRUCTURE_HASH,
 		order.Salt,
 		order.Maker,

@@ -4,6 +4,7 @@ package polymarket
 import (
 	"time"
 
+	"github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 )
 
@@ -17,9 +18,10 @@ type PolymarketConfig struct {
 	RelayerBaseURL string `mapstructure:"relayer_base_url"`
 	DataAPIBaseURL string `mapstructure:"data_api_base_url"`
 
-	OwnerKey     string             `mapstructure:"owner_key"`
-	CLOBCreds    *model.ApiKeyCreds `mapstructure:"clob_creds"`
-	BuilderCreds *model.ApiKeyCreds `mapstructure:"builder_creds"`
+	OwnerKey     string              `mapstructure:"owner_key"`
+	CLOBCreds    *model.ApiKeyCreds  `mapstructure:"clob_creds"`
+	BuilderCreds *model.ApiKeyCreds  `mapstructure:"builder_creds"`
+	RelayerKey   *headers.RelayerKey `mapstructure:"relayer_key"`
 }
 
 type Config struct {

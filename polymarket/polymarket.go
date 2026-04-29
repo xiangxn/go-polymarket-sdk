@@ -451,11 +451,11 @@ func (c *PolymarketClient) PostOrder(order *orders.SignedOrder, orderType orders
 	}
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
-	if c.cfg.Polymarket.HasBuilderAuth() {
-		builderHeaders := Headers.CreateBuilderHeaders(c.cfg.Polymarket.BuilderCreds, resty.MethodPost, path, &body, nil)
+	if c.cfg.Polymarket.HasRelayerAuth() {
+		relayerHeaders := Headers.CreateRelayerHeaders(c.cfg.Polymarket.RelayerKey)
 
-		if builderHeaders != nil {
-			maps.Copy(headers, builderHeaders)
+		if relayerHeaders != nil {
+			maps.Copy(headers, relayerHeaders)
 		}
 	}
 	log.Printf("PostOrder 处理时间: %d", time.Now().UnixMilli())
@@ -510,11 +510,11 @@ func (c *PolymarketClient) PostOrders(args []orders.PostOrdersArgs, deferExec bo
 	}
 	headers := Headers.CreateL2Headers(c.signer.Address, c.cfg.Polymarket.CLOBCreds, &l2HeaderArgs, nil)
 
-	if c.cfg.Polymarket.HasBuilderAuth() {
-		builderHeaders := Headers.CreateBuilderHeaders(c.cfg.Polymarket.BuilderCreds, resty.MethodPost, path, &body, nil)
+	if c.cfg.Polymarket.HasRelayerAuth() {
+		relayerHeaders := Headers.CreateRelayerHeaders(c.cfg.Polymarket.RelayerKey)
 
-		if builderHeaders != nil {
-			maps.Copy(headers, builderHeaders)
+		if relayerHeaders != nil {
+			maps.Copy(headers, relayerHeaders)
 		}
 	}
 	log.Printf("[PolymarketClient] PostOrders 处理时间: %d", time.Now().UnixMilli())

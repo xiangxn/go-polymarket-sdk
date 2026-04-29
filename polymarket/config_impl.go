@@ -12,6 +12,10 @@ func (c *PolymarketConfig) HasBuilderAuth() bool {
 	return c.BuilderCreds != nil
 }
 
+func (c *PolymarketConfig) HasRelayerAuth() bool {
+	return c.RelayerKey != nil
+}
+
 func DefaultConfig() *Config {
 	return &Config{
 		HttpTimeout: 10 * time.Second,

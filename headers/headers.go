@@ -11,6 +11,16 @@ import (
 	"resty.dev/v3"
 )
 
+func CreateRelayerHeaders(relayerKey *RelayerKey) map[string]string {
+	if relayerKey == nil {
+		panic("relayerKey is nil")
+	}
+	return map[string]string{
+		"RELAYER_API_KEY":         relayerKey.ApiKey,
+		"RELAYER_API_KEY_ADDRESS": relayerKey.ApiKeyAddress,
+	}
+}
+
 func CreateL2Headers(signer common.Address, creds *model.ApiKeyCreds, l2HeaderArgs *L2HeaderArgs, timestamp *int64) map[string]string {
 	if timestamp == nil {
 		now := time.Now().Unix()
