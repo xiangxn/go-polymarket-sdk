@@ -79,5 +79,4 @@ type TransactionRequest struct {
 	Signature       string          `json:"signature"`
 	SignatureParams SignatureParams `json:"signatureParams"`
 	Type            string          `json:"type"`
-	Metadata        *string         `json:"metadata,omitempty"`
 }

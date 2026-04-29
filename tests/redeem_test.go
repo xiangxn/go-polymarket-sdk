@@ -50,8 +50,8 @@ func TestRedeem(t *testing.T) {
 	// 	t.Log("no positions to redeem")
 	// 	return
 	// }
-	relayClient := builder.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil)
-	result, err := relayClient.RedeemBatch(conditionIds, negRisks, amounts, nil)
+	relayClient := builder.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil, config.Polymarket.RelayerKey)
+	result, err := relayClient.RedeemBatch(conditionIds, negRisks, amounts)
 	if err != nil {
 		t.Fatal(err)
 	}

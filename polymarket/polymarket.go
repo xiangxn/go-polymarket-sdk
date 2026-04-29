@@ -360,6 +360,9 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
+	if userOrder.BuilderCode == nil {
+		userOrder.BuilderCode = c.cfg.Polymarket.BuilderCode
+	}
 	orderData, err := orders.BuildOrderCreationArgs(c.signer.Address.String(), maker, signatureType, userOrder, orders.GetRoundConfig(tickSize))
 	if err != nil {
 		return nil, err
@@ -406,6 +409,10 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 		nr = orders.NegRiskCTFExchange
 	} else {
 		nr = orders.CTFExchange
+	}
+
+	if userMarketOrder.BuilderCode == nil {
+		userMarketOrder.BuilderCode = c.cfg.Polymarket.BuilderCode
 	}
 
 	builder := orders.NewOrderBuilderImpl(big.NewInt(c.cfg.Polymarket.ChainID), nil)

@@ -30,6 +30,7 @@ func DefaultConfig() *Config {
 			RelayerBaseURL: "https://relayer-v2.polymarket.com",
 			DataAPIBaseURL: "https://data-api.polymarket.com",
 
+			BuilderCode:  nil,
 			OwnerKey:     "1111111111111111111111111111111111111111111111111111111111111111",
 			CLOBCreds:    nil,
 			BuilderCreds: nil,

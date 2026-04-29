@@ -137,7 +137,7 @@ func (c *RelayClient) GetRelayPayload(signerAddress common.Address, signerType s
 	}, nil
 }
 
-func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata *string) (*RelayerTransactionResponse, error) {
+func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction) (*RelayerTransactionResponse, error) {
 	if c.signer == nil {
 		return nil, fmt.Errorf("signer is nil")
 	}
@@ -168,7 +168,7 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata 
 		return nil, fmt.Errorf("safeContractConfig is nil")
 	}
 
-	request, err := BuildSafeTransactionRequest(c.signer, &args, c.safeContractConfig, metadata)
+	request, err := BuildSafeTransactionRequest(c.signer, &args, c.safeContractConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (c *RelayClient) GetExpectedSafe(signer common.Address) common.Address {
 	return DeriveSafe(signer, c.safeContractConfig.SafeFactory)
 }
 
-func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amounts [][]*big.Int, metadatas []any) ([]any, error) {
+func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amounts [][]*big.Int) (*RelayerTransactionResponse, error) {
 	if conditionIds == nil {
 		return nil, fmt.Errorf("conditionIds is nil")
 	}
@@ -252,19 +252,10 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 		}
 	}
 
-	meta := "Redeem batch position"
-	if metadatas != nil {
-		metadata, err0 := json.Marshal(metadatas)
-		if err0 != nil {
-			return nil, err0
-		}
-		meta = string(metadata)
-	}
-
-	resp, err := c.EexecuteSafeTransactions(redeemTxs, &meta)
+	resp, err := c.EexecuteSafeTransactions(redeemTxs)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("[RelayClient] Redeem: %+v", resp)
-	return metadatas, nil
+	return resp, nil
 }

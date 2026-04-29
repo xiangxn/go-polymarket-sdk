@@ -21,7 +21,6 @@ func BuildSafeTransactionRequest(
 	signer *polymarket.Signer,
 	args *SafeTransactionArgs,
 	safeContractConfig *SafeContractConfig,
-	metadata *string,
 ) (*TransactionRequest, error) {
 	transaction, err := AggregateTransaction(args.Transactions, safeContractConfig.SafeMultisend)
 	if err != nil {
@@ -47,9 +46,6 @@ func BuildSafeTransactionRequest(
 		GasToken:       utils.StringPtr(gasToken.String()),
 		RefundReceiver: utils.StringPtr(refundReceiver.String()),
 	}
-	if metadata == nil {
-		metadata = utils.StringPtr("")
-	}
 	return &TransactionRequest{
 		From:            args.From.Hex(),
 		To:              transaction.To.Hex(),
@@ -59,7 +55,6 @@ func BuildSafeTransactionRequest(
 		Signature:       "0x" + common.Bytes2Hex(sig),
 		SignatureParams: sigParams,
 		Type:            string(TT_SAFE),
-		Metadata:        metadata,
 	}, nil
 }
 
