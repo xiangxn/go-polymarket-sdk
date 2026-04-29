@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"maps"
 	"math/big"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 	ctokens "github.com/ivanzzeth/polymarket-go-contracts/contracts/conditional-tokens"
 	negriskadapter "github.com/ivanzzeth/polymarket-go-contracts/contracts/neg-risk-adapter"
 	"github.com/tidwall/gjson"
-	"github.com/xiangxn/go-polymarket-sdk/headers"
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
@@ -27,9 +27,10 @@ type RelayClient struct {
 	signer             *polymarket.Signer
 	BuilderCreds       *model.ApiKeyCreds
 	safeContractConfig *SafeContractConfig
+	relayerKey         *Headers.RelayerKey
 }
 
-func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *model.ApiKeyCreds, safeContractConfig *SafeContractConfig) *RelayClient {
+func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *model.ApiKeyCreds, safeContractConfig *SafeContractConfig, relayerKey *Headers.RelayerKey) *RelayClient {
 	if strings.HasPrefix(signerKey, "0x") {
 		signerKey = signerKey[2:]
 	}
@@ -47,6 +48,7 @@ func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderC
 		BuilderCreds:       builderCreds,
 		chainId:            new(big.Int).SetInt64(chainId),
 		safeContractConfig: safeContractConfig,
+		relayerKey:         relayerKey,
 	}
 }
 
@@ -179,7 +181,15 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction, metadata 
 	// log.Printf("EexecuteSafeTransactions body: %s", body)
 	var builderHeaders map[string]string
 	if c.BuilderCreds != nil {
-		builderHeaders = headers.CreateBuilderHeaders(c.BuilderCreds, resty.MethodPost, SUBMIT_TRANSACTION, &body, nil)
+		builderHeaders = Headers.CreateBuilderHeaders(c.BuilderCreds, resty.MethodPost, SUBMIT_TRANSACTION, &body, nil)
+	}
+
+	var relayerHeaders map[string]string
+	if c.relayerKey != nil {
+		relayerHeaders = Headers.CreateRelayerHeaders(c.relayerKey)
+		if relayerHeaders != nil {
+			maps.Copy(builderHeaders, relayerHeaders)
+		}
 	}
 	resp, err := c.Post(url, body, builderHeaders)
 	if err != nil {
