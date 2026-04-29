@@ -50,7 +50,7 @@ type WSMakerOrder struct {
 	Owner         string      `json:"owner"`
 	Side          string      `json:"side"`
 	Price         float64     `json:"price,string"`
-	FeeRateBps    SafeFloat64 `json:"fee_rate_bps,string"`
+	FeeRateBps    SafeFloat64 `json:"fee_rate_bps"`
 }
 
 type WSTrade struct {
@@ -60,13 +60,13 @@ type WSTrade struct {
 	LastUpdate  int64          `json:"last_update,string"`
 	MakerOrders []WSMakerOrder `json:"maker_orders"`
 	Market      string         `json:"market"`
-	Matchtime   int64          `json:"matchtime,string"`
+	Matchtime   int64          `json:"match_time,string"`
 	Outcome     string         `json:"outcome"`
 	Owner       string         `json:"owner"`
 	Price       float64        `json:"price,string"`
 	Side        string         `json:"side"`
 	Size        float64        `json:"size,string"`
-	FeeRateBps  SafeFloat64    `json:"fee_rate_bps,string"`
+	FeeRateBps  SafeFloat64    `json:"fee_rate_bps"`
 	// MATCHED, MINED, CONFIRMED, RETRYING, FAILED
 	Status       string `json:"status"`
 	TakerOrderId string `json:"taker_order_id"`
