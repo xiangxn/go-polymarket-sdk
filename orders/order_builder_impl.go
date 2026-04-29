@@ -3,7 +3,6 @@ package orders
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"log"
 	"math/big"
 	"time"
 
@@ -158,7 +157,7 @@ func (e *OrderBuilderImpl) BuildOrderHash(order *Order, contract VerifyingContra
 	}
 
 	domainSeparator := eip712.BuildEIP712DomainSeparator(_PROTOCOL_NAME, _PROTOCOL_VERSION, e.chainId, verifyingContract)
-	log.Printf("domainSeparator: %s", domainSeparator.Hex())
+	// log.Printf("domainSeparator: %s", domainSeparator.Hex())
 
 	values := []any{
 		_ORDER_STRUCTURE_HASH,
