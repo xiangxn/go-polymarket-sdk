@@ -1,5 +1,10 @@
 package model
 
+import (
+	"strconv"
+	"strings"
+)
+
 type SubscribeUserMessage struct {
 	Type    string      `json:"type"`
 	Markets []string    `json:"markets"`
@@ -38,14 +43,14 @@ type WSOrder struct {
 }
 
 type WSMakerOrder struct {
-	AssetId       string   `json:"asset_id"`
-	MatchedAmount float64  `json:"matched_amount,string"`
-	OrderId       string   `json:"order_id"`
-	Outcome       string   `json:"outcome"`
-	Owner         string   `json:"owner"`
-	Side          string   `json:"side"`
-	Price         float64  `json:"price,string"`
-	FeeRateBps    *float64 `json:"fee_rate_bps,string"`
+	AssetId       string      `json:"asset_id"`
+	MatchedAmount float64     `json:"matched_amount,string"`
+	OrderId       string      `json:"order_id"`
+	Outcome       string      `json:"outcome"`
+	Owner         string      `json:"owner"`
+	Side          string      `json:"side"`
+	Price         float64     `json:"price,string"`
+	FeeRateBps    SafeFloat64 `json:"fee_rate_bps,string"`
 }
 
 type WSTrade struct {
@@ -61,11 +66,30 @@ type WSTrade struct {
 	Price       float64        `json:"price,string"`
 	Side        string         `json:"side"`
 	Size        float64        `json:"size,string"`
-	FeeRateBps  float64        `json:"fee_rate_bps,string"`
+	FeeRateBps  SafeFloat64    `json:"fee_rate_bps,string"`
 	// MATCHED, MINED, CONFIRMED, RETRYING, FAILED
 	Status       string `json:"status"`
 	TakerOrderId string `json:"taker_order_id"`
 	Timestamp    int64  `json:"timestamp,string"`
 	TradeOwner   string `json:"trade_owner"`
 	Type         string `json:"type"`
+}
+
+type SafeFloat64 float64
+
+func (f *SafeFloat64) UnmarshalJSON(b []byte) error {
+	str := strings.Trim(string(b), `"`)
+
+	if str == "" || str == "null" {
+		*f = 0
+		return nil
+	}
+
+	v, err := strconv.ParseFloat(str, 64)
+	if err != nil {
+		return err
+	}
+
+	*f = SafeFloat64(v)
+	return nil
 }

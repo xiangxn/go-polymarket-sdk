@@ -140,7 +140,7 @@ func buildOwnOrderFillsFromTradeEvent(ev polymarket.TradeEvent, ownOrders map[st
 				Side:      ev.Trade.Side,
 				Price:     ev.Trade.Price,
 				Size:      ev.Trade.Size,
-				Fee:       ev.Trade.FeeRateBps * ev.Trade.Size * ev.Trade.Price,
+				Fee:       float64(ev.Trade.FeeRateBps) * ev.Trade.Size * ev.Trade.Price,
 				Time:      ev.Trade.Timestamp,
 			})
 		}
@@ -159,7 +159,7 @@ func buildOwnOrderFillsFromTradeEvent(ev polymarket.TradeEvent, ownOrders map[st
 				Side:      mo.Side,
 				Price:     mo.Price,
 				Size:      mo.MatchedAmount,
-				Fee:       mo.FeeRateBps * mo.MatchedAmount * mo.Price,
+				Fee:       float64(mo.FeeRateBps) * mo.MatchedAmount * mo.Price,
 				Time:      ev.Trade.Timestamp,
 			})
 		}
