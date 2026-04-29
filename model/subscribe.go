@@ -38,14 +38,14 @@ type WSOrder struct {
 }
 
 type WSMakerOrder struct {
-	AssetId       string  `json:"asset_id"`
-	MatchedAmount float64 `json:"matched_amount,string"`
-	OrderId       string  `json:"order_id"`
-	Outcome       string  `json:"outcome"`
-	Owner         string  `json:"owner"`
-	Side          string  `json:"side"`
-	Price         float64 `json:"price,string"`
-	FeeRateBps    float64 `json:"fee_rate_bps,string"`
+	AssetId       string   `json:"asset_id"`
+	MatchedAmount float64  `json:"matched_amount,string"`
+	OrderId       string   `json:"order_id"`
+	Outcome       string   `json:"outcome"`
+	Owner         string   `json:"owner"`
+	Side          string   `json:"side"`
+	Price         float64  `json:"price,string"`
+	FeeRateBps    *float64 `json:"fee_rate_bps,string"`
 }
 
 type WSTrade struct {
