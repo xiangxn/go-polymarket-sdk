@@ -25,11 +25,11 @@ const (
 	FAK OrderType = "FAK"
 )
 
-type SideType string
+type Side string
 
 const (
-	POST_BUY  SideType = "BUY"
-	POST_SELL SideType = "SELL"
+	BUY  Side = "BUY"
+	SELL Side = "SELL"
 )
 
 type PostOrderDTO struct {
@@ -45,6 +45,8 @@ type PostOrdersArgs struct {
 }
 
 type OrderDTO struct {
+	Salt int64 `json:"salt"`
+
 	// Ethereum address of the maker (In the default case, this is your proxy address)
 	Maker string `json:"maker"`
 
@@ -63,27 +65,25 @@ type OrderDTO struct {
 	TakerAmount string `json:"takerAmount"`
 
 	// 订单方向，买入或卖出, BUY or SELL
-	Side SideType `json:"side"`
+	Side Side `json:"side"`
+
+	// 订单使用的签名类型。默认值为“EOA”。
+	SignatureType SignatureType `json:"signatureType"`
+
+	// Unix timestamp in milliseconds when the order was created (used for order uniqueness)
+	Timestamp string `json:"timestamp"`
 
 	// 订单过期的时间戳。
 	// 可选，如果未指定，则值为“0”（无过期时间）。
 	// Unix timestamp when the order expires. Present in the API wire body; not part of the CLOB V2 EIP-712 signed order struct.
 	Expiration string `json:"expiration"`
 
-	// Unix timestamp in milliseconds when the order was created (used for order uniqueness)
-	Timestamp string `json:"timestamp"`
+	Metadata string `json:"metadata"`
 
 	// Builder code (bytes32) for integrator attribution. 0x + 64 hex chars or empty.
 	Builder string `json:"builder"`
 
 	Signature string `json:"signature"`
-
-	Salt int64 `json:"salt"`
-
-	// 订单使用的签名类型。默认值为“EOA”。
-	SignatureType SignatureType `json:"signatureType"`
-
-	Metadata string `json:"metadata"`
 }
 
 type RoundConfig struct {

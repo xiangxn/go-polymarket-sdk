@@ -30,7 +30,7 @@ func TestGetOrderBooks(t *testing.T) {
 	tokenID2 := os.Getenv("TOKENID2")
 	client := polymarket.NewClient(config)
 
-	side := orders.POST_BUY
+	side := orders.BUY
 	orderBooks, err := client.GetOrderBooks([]polymarket.BookParams{{
 		TokenId: tokenID,
 		Side:    &side,

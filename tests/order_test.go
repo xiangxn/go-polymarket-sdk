@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
@@ -60,6 +61,10 @@ func TestCreateMarketOrder(t *testing.T) {
 func TestPlaceOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
 	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	config.Polymarket.RelayerKey = &headers.RelayerKey{
+		ApiKey:        os.Getenv("RELAYER_API_KEY"),
+		ApiKeyAddress: os.Getenv("RELAYER_API_KEY_ADDRESS"),
+	}
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	tokenID := os.Getenv("TOKENID2")
 

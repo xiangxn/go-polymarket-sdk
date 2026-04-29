@@ -117,11 +117,11 @@ func BuildMarketOrderCreationArgs(signer string, maker string, signatureType Sig
 }
 
 func OrderToDTO(order *SignedOrder, owner string, orderType OrderType, deferExec bool, expiration string) PostOrderDTO {
-	side := POST_BUY
-	if order.Side.Int64() == int64(SELL) {
-		side = POST_SELL
+	var side Side
+	if order.Side.Int64() == int64(0) {
+		side = BUY
 	} else {
-		side = POST_BUY
+		side = SELL
 	}
 	return PostOrderDTO{
 		DeferExec: deferExec,

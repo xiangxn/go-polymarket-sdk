@@ -45,8 +45,8 @@ type OrderBook struct {
 }
 
 type BookParams struct {
-	TokenId string           `json:"token_id"`
-	Side    *orders.SideType `json:"side,omitempty"`
+	TokenId string       `json:"token_id"`
+	Side    *orders.Side `json:"side,omitempty"`
 }
 
 // PriceData 表示价格数据,这个数据中的(MinOrderSize,TickSize,NegRisk)只在rest api中返回,ws api不返回

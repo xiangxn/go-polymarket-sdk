@@ -3,6 +3,7 @@ package orders
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -40,16 +41,19 @@ func (e *OrderBuilderImpl) BuildSignedOrder(privateKey *ecdsa.PrivateKey, orderD
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("order: %+v", order)
 
 	orderHash, err := e.BuildOrderHash(order, contract)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("orderHash: %s", orderHash.Hex())
 
 	sign, err := e.BuildOrderSignature(privateKey, orderHash)
 	if err != nil {
 		return nil, err
 	}
+	log.Printf("sign: %s", common.Bytes2Hex(sign))
 
 	ok, err := signature.ValidateSignature(order.Signer, orderHash, sign)
 	if err != nil {
@@ -122,6 +126,11 @@ func (e *OrderBuilderImpl) BuildOrder(orderData *OrderData) (*Order, error) {
 		builder = common.HexToHash(*orderData.Builder)
 	}
 
+	side := 0
+	if orderData.Side == SELL {
+		side = 1
+	}
+
 	return &Order{
 		Salt:          big.NewInt(e.saltGenerator()),
 		Maker:         common.HexToAddress(orderData.Maker),
@@ -129,7 +138,7 @@ func (e *OrderBuilderImpl) BuildOrder(orderData *OrderData) (*Order, error) {
 		TokenId:       tokenId,
 		MakerAmount:   makerAmount,
 		TakerAmount:   takerAmount,
-		Side:          big.NewInt(int64(orderData.Side)),
+		Side:          big.NewInt(int64(side)),
 		SignatureType: big.NewInt(int64(signatureType)),
 		Timestamp:     timestamp,
 		Metadata:      metadata,
@@ -149,9 +158,7 @@ func (e *OrderBuilderImpl) BuildOrderHash(order *Order, contract VerifyingContra
 	}
 
 	domainSeparator := eip712.BuildEIP712DomainSeparator(_PROTOCOL_NAME, _PROTOCOL_VERSION, e.chainId, verifyingContract)
-	if err != nil {
-		return OrderHash{}, err
-	}
+	log.Printf("domainSeparator: %s", domainSeparator.Hex())
 
 	values := []any{
 		_ORDER_STRUCTURE_HASH,

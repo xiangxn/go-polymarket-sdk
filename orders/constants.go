@@ -30,7 +30,7 @@ var (
 
 var (
 	_ORDER_STRUCTURE_HASH = crypto.Keccak256Hash(
-		[]byte("Order(uint256 salt,address maker,address signer,uint256 tokenId,uint256 makerAmount,uint256 takerAmount,uint8 side,uint8 signatureType,uint256 timestamp,bytes32 metadata,bytes32 builder,bytes signature)"),
+		[]byte("Order(uint256 salt,address maker,address signer,uint256 tokenId,uint256 makerAmount,uint256 takerAmount,uint8 side,uint8 signatureType,uint256 timestamp,bytes32 metadata,bytes32 builder)"),
 	)
 )
 
@@ -56,13 +56,6 @@ const (
 	 * EIP1271 signatures signed by smart contracts. To be used by smart contract wallets or vaults
 	 */
 	POLY_1271
-)
-
-type Side = int
-
-const (
-	BUY Side = iota
-	SELL
 )
 
 type VerifyingContract = int
