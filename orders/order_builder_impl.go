@@ -41,19 +41,19 @@ func (e *OrderBuilderImpl) BuildSignedOrder(privateKey *ecdsa.PrivateKey, orderD
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("order: %+v", order)
+	// log.Printf("order: %+v", order)
 
 	orderHash, err := e.BuildOrderHash(order, contract)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("orderHash: %s", orderHash.Hex())
+	// log.Printf("orderHash: %s", orderHash.Hex())
 
 	sign, err := e.BuildOrderSignature(privateKey, orderHash)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("sign: %s", common.Bytes2Hex(sign))
+	// log.Printf("sign: %s", common.Bytes2Hex(sign))
 
 	ok, err := signature.ValidateSignature(order.Signer, orderHash, sign)
 	if err != nil {

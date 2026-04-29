@@ -367,12 +367,12 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("orderData: %+v", orderData)
+	// log.Printf("orderData: %+v", orderData)
 	order, err := builder.BuildSignedOrder(c.signer.PrivateKey, orderData, nr)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("SignedOrder: %+v", order)
+	// log.Printf("SignedOrder: %+v", order)
 	return order, nil
 }
 
