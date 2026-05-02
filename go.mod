@@ -6,7 +6,7 @@ require (
 	github.com/ethereum/go-ethereum v1.16.1
 	github.com/gorilla/websocket v1.5.3
 	github.com/ivanzzeth/ethsig v0.1.0
-	github.com/ivanzzeth/polymarket-go-contracts v0.1.0
+	github.com/ivanzzeth/polymarket-go-contracts/v2 v2.0.0
 	github.com/shopspring/decimal v1.4.0
 	github.com/tidwall/gjson v1.18.0
 	resty.dev/v3 v3.0.0-beta.5

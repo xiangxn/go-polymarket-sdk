@@ -5,10 +5,10 @@ import (
 	"os"
 	"testing"
 
-	"github.com/xiangxn/go-polymarket-sdk/builder"
 	"github.com/xiangxn/go-polymarket-sdk/constants"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
+	"github.com/xiangxn/go-polymarket-sdk/relayer"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
@@ -50,7 +50,7 @@ func TestRedeem(t *testing.T) {
 	// 	t.Log("no positions to redeem")
 	// 	return
 	// }
-	relayClient := builder.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil, config.Polymarket.RelayerKey)
+	relayClient := relayer.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil, config.Polymarket.RelayerKey)
 	result, err := relayClient.RedeemBatch(conditionIds, negRisks, amounts)
 	if err != nil {
 		t.Fatal(err)

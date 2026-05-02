@@ -1,4 +1,4 @@
-package builder
+package relayer
 
 import (
 	"bytes"
@@ -12,7 +12,8 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ivanzzeth/ethsig"
 	"github.com/ivanzzeth/ethsig/eip712"
-	pgc "github.com/ivanzzeth/polymarket-go-contracts"
+	pgc "github.com/ivanzzeth/polymarket-go-contracts/v2"
+	"github.com/xiangxn/go-polymarket-sdk/constants"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
@@ -29,8 +30,8 @@ func BuildSafeTransactionRequest(
 	safeTxnGas := big.NewInt(0)
 	baseGas := big.NewInt(0)
 	gasPrice := big.NewInt(0)
-	gasToken := ZeroAddress
-	refundReceiver := ZeroAddress
+	gasToken := constants.ZeroAddress
+	refundReceiver := constants.ZeroAddress
 	safeAddress := DeriveSafe(args.From, safeContractConfig.SafeFactory)
 
 	typedData := pgc.BuildSafeTransactionTypedData(args.ChainId, safeAddress, transaction.To, transaction.Value, transaction.Data, transaction.Operation, safeTxnGas, baseGas, gasPrice, gasToken, refundReceiver, args.Nonce)

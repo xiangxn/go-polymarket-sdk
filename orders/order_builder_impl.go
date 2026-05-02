@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/xiangxn/go-polymarket-sdk/eip712"
+	etheip712 "github.com/ivanzzeth/ethsig/eip712"
 	"github.com/xiangxn/go-polymarket-sdk/signature"
 )
 
@@ -156,29 +156,36 @@ func (e *OrderBuilderImpl) BuildOrderHash(order *Order, contract VerifyingContra
 		return OrderHash{}, err
 	}
 
-	domainSeparator := eip712.BuildEIP712DomainSeparator(_PROTOCOL_NAME, _PROTOCOL_VERSION, e.chainId, verifyingContract)
-	// log.Printf("domainSeparator: %s", domainSeparator.Hex())
-
-	values := []any{
-		_ORDER_STRUCTURE_HASH,
-		order.Salt,
-		order.Maker,
-		order.Signer,
-		order.TokenId,
-		order.MakerAmount,
-		order.TakerAmount,
-		uint8(order.Side.Uint64()),
-		uint8(order.SignatureType.Uint64()),
-		order.Timestamp,
-		order.Metadata,
-		order.Builder,
+	typedData := etheip712.TypedData{
+		Types:       _ORDER_EIP712_TYPES,
+		PrimaryType: _ORDER_PRIMARY_TYPE,
+		Domain: etheip712.TypedDataDomain{
+			Name:              _PROTOCOL_NAME,
+			Version:           _PROTOCOL_VERSION,
+			ChainId:           e.chainId.String(),
+			VerifyingContract: verifyingContract.Hex(),
+		},
+		Message: etheip712.TypedDataMessage{
+			"salt":          order.Salt,
+			"maker":         order.Maker,
+			"signer":        order.Signer,
+			"tokenId":       order.TokenId,
+			"makerAmount":   order.MakerAmount,
+			"takerAmount":   order.TakerAmount,
+			"side":          order.Side,
+			"signatureType": order.SignatureType,
+			"timestamp":     order.Timestamp,
+			"metadata":      order.Metadata,
+			"builder":       order.Builder,
+		},
 	}
-	orderHash, err := eip712.HashTypedData(domainSeparator, _ORDER_STRUCTURE, values)
+
+	hash, _, err := etheip712.TypedDataAndHash(typedData)
 	if err != nil {
 		return OrderHash{}, err
 	}
 
-	return orderHash, nil
+	return common.BytesToHash(hash), nil
 }
 
 // signs an order

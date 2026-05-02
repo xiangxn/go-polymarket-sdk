@@ -1,4 +1,4 @@
-package builder
+package relayer
 
 import (
 	"encoding/json"
@@ -10,10 +10,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
-	pgc "github.com/ivanzzeth/polymarket-go-contracts"
-	ctokens "github.com/ivanzzeth/polymarket-go-contracts/contracts/conditional-tokens"
-	negriskadapter "github.com/ivanzzeth/polymarket-go-contracts/contracts/neg-risk-adapter"
+	pgc "github.com/ivanzzeth/polymarket-go-contracts/v2"
+	ctokens "github.com/ivanzzeth/polymarket-go-contracts/v2/contracts/conditional-tokens"
+	negriskadapter "github.com/ivanzzeth/polymarket-go-contracts/v2/contracts/neg-risk-adapter"
 	"github.com/tidwall/gjson"
+	"github.com/xiangxn/go-polymarket-sdk/constants"
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
@@ -39,7 +40,7 @@ func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderC
 		panic(err)
 	}
 	if safeContractConfig == nil {
-		safeContractConfig = DefaultSafeContractConfig()
+		safeContractConfig = DefaultSafeContractConfig(chainId)
 	}
 	return &RelayClient{
 		relayerBaseURL:     relayerUrl,
@@ -223,6 +224,7 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse ConditionalTokens ABI: %w", err)
 	}
+	constract := pgc.GetContractConfig(c.chainId)
 	indexSets := []*big.Int{big.NewInt(1), big.NewInt(2)}
 	for i, conditionId := range conditionIds {
 		negRisk := negRisks[i]
@@ -233,18 +235,18 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err2)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        common.HexToAddress(NEG_RISK_CTF_ADDRESS),
+				To:        constract.NegRiskExchangeV2,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),
 			})
 		} else {
-			calldata, err3 := ctfABI.Pack("redeemPositions", common.HexToAddress(USDC_ADDRESS), HashZero, common.HexToHash(conditionId), indexSets)
+			calldata, err3 := ctfABI.Pack("redeemPositions", constract.CollateralToken, constants.HashZero, common.HexToHash(conditionId), indexSets)
 			if err3 != nil {
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err3)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        common.HexToAddress(CTF_ADDRESS),
+				To:        constract.ExchangeV2,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),

@@ -1,10 +1,10 @@
-package builder
+package relayer
 
 import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	pgc "github.com/ivanzzeth/polymarket-go-contracts"
+	pgc "github.com/ivanzzeth/polymarket-go-contracts/v2"
 )
 
 type SafeTransaction struct {

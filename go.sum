@@ -143,8 +143,8 @@ github.com/ivanzzeth/ethclient v0.1.35 h1:QLySJK1gQl1z3W27Imbhv5Z8ao5BPaPGisGboy
 github.com/ivanzzeth/ethclient v0.1.35/go.mod h1:429cyiRRF0/atJFnCjfkgjZPEFyRgzFRQYHsakF5ifc=
 github.com/ivanzzeth/ethsig v0.1.0 h1:GTQoWgRute5+y/+7JOXT02v9wJJkmwbGojX3TK8PyDQ=
 github.com/ivanzzeth/ethsig v0.1.0/go.mod h1:ImQMZpAnI8QyfTQEyqMFVCoxK9ymPr90PTvhGeThnms=
-github.com/ivanzzeth/polymarket-go-contracts v0.1.0 h1:XXyNE20BlHY567sV1srhXdSEVizE6mTT4DydRW5bZiY=
-github.com/ivanzzeth/polymarket-go-contracts v0.1.0/go.mod h1:a5sViVl8tT799MxR9TVUjtK1Zj9TRmSn84JNTHVycJ4=
+github.com/ivanzzeth/polymarket-go-contracts/v2 v2.0.0 h1:+sNFce+M/RgyW4qqC13j8zP5afX5vlneH0HQUefKNS8=
+github.com/ivanzzeth/polymarket-go-contracts/v2 v2.0.0/go.mod h1:sPC7pFVqTGxCIhhZIx5f7IY7JfnZtcVXoQwM4cJJC4w=
 github.com/jackpal/go-nat-pmp v1.0.2 h1:KzKSgb7qkJvOUTqYl9/Hg/me3pWgBmERKrTGD7BdWus=
 github.com/jackpal/go-nat-pmp v1.0.2/go.mod h1:QPH045xvCAeXUZOxsnwmrtiCoxIr9eob+4orBN1SBKc=
 github.com/klauspost/compress v1.18.0 h1:c/Cqfb0r+Yi+JtIEq73FWXVkRonBlf0CRNYc8Zttxdo=

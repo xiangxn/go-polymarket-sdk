@@ -1,38 +1,35 @@
 package orders
 
-import (
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/xiangxn/go-polymarket-sdk/eip712"
+import "github.com/ivanzzeth/ethsig/eip712"
+
+const (
+	_PROTOCOL_NAME    = "Polymarket CTF Exchange"
+	_PROTOCOL_VERSION = "2"
 )
 
-var (
-	_PROTOCOL_NAME    = crypto.Keccak256Hash([]byte("Polymarket CTF Exchange"))
-	_PROTOCOL_VERSION = crypto.Keccak256Hash([]byte("2"))
-)
+const _ORDER_PRIMARY_TYPE = "Order"
 
-var (
-	_ORDER_STRUCTURE = []abi.Type{
-		eip712.Bytes32, // typehash
-		eip712.Uint256, // salt
-		eip712.Address, // maker
-		eip712.Address, // signer
-		eip712.Uint256, // tokenId
-		eip712.Uint256, // makerAmount
-		eip712.Uint256, // takerAmount
-		eip712.Uint8,   // side
-		eip712.Uint8,   // signatureType
-		eip712.Uint256, // timestamp
-		eip712.Bytes32, // metadata
-		eip712.Bytes32, // builder
-	}
-)
-
-var (
-	_ORDER_STRUCTURE_HASH = crypto.Keccak256Hash(
-		[]byte("Order(uint256 salt,address maker,address signer,uint256 tokenId,uint256 makerAmount,uint256 takerAmount,uint8 side,uint8 signatureType,uint256 timestamp,bytes32 metadata,bytes32 builder)"),
-	)
-)
+var _ORDER_EIP712_TYPES = eip712.Types{
+	"EIP712Domain": {
+		{Name: "name", Type: "string"},
+		{Name: "version", Type: "string"},
+		{Name: "chainId", Type: "uint256"},
+		{Name: "verifyingContract", Type: "address"},
+	},
+	_ORDER_PRIMARY_TYPE: {
+		{Name: "salt", Type: "uint256"},
+		{Name: "maker", Type: "address"},
+		{Name: "signer", Type: "address"},
+		{Name: "tokenId", Type: "uint256"},
+		{Name: "makerAmount", Type: "uint256"},
+		{Name: "takerAmount", Type: "uint256"},
+		{Name: "side", Type: "uint8"},
+		{Name: "signatureType", Type: "uint8"},
+		{Name: "timestamp", Type: "uint256"},
+		{Name: "metadata", Type: "bytes32"},
+		{Name: "builder", Type: "bytes32"},
+	},
+}
 
 type SignatureType = int
 

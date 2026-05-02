@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	pgc "github.com/ivanzzeth/polymarket-go-contracts/v2"
 )
 
 type OrderBuilder interface {
@@ -43,16 +44,13 @@ type OrderBuilder interface {
 }
 
 func GetVerifyingContractAddress(chainId *big.Int, contract VerifyingContract) (common.Address, error) {
-	contracts, err := GetContracts(chainId.Int64())
-	if err != nil {
-		return common.Address{}, err
-	}
+	contracts := pgc.GetContractConfig(chainId)
 
 	switch contract {
 	case CTFExchange:
-		return contracts.Exchange, nil
+		return contracts.ExchangeV2, nil
 	case NegRiskCTFExchange:
-		return contracts.NegRiskExchange, nil
+		return contracts.NegRiskExchangeV2, nil
 	}
 
 	return common.Address{}, fmt.Errorf("invalid contract")

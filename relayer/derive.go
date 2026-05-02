@@ -1,8 +1,9 @@
-package builder
+package relayer
 
 import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/xiangxn/go-polymarket-sdk/constants"
 )
 
 func DeriveProxyWallet(address common.Address, proxyFactory common.Address) common.Address {
@@ -18,7 +19,7 @@ func DeriveProxyWallet(address common.Address, proxyFactory common.Address) comm
 	return GetCreate2Address(
 		proxyFactory,
 		salt,
-		common.HexToHash(PROXY_INIT_CODE_HASH).Bytes(),
+		common.HexToHash(constants.PROXY_INIT_CODE_HASH).Bytes(),
 	)
 }
 
@@ -36,6 +37,6 @@ func DeriveSafe(address common.Address, safeFactory common.Address) common.Addre
 	return GetCreate2Address(
 		safeFactory,
 		salt,
-		common.FromHex(SAFE_INIT_CODE_HASH),
+		common.FromHex(constants.SAFE_INIT_CODE_HASH),
 	)
 }
