@@ -3,6 +3,7 @@ package tests
 import (
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/xiangxn/go-polymarket-sdk/constants"
@@ -56,4 +57,70 @@ func TestRedeem(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("result: %+v", result)
+}
+
+func TestSplitTokens(t *testing.T) {
+	relayClient := &relayer.RelayClient{}
+
+	_, err := relayClient.SplitTokens("", "1")
+	if err == nil || err.Error() != "conditionId is empty" {
+		t.Fatalf("SplitTokens() error = %v, want %q", err, "conditionId is empty")
+	}
+
+	_, err = relayClient.SplitTokens("0x123", "")
+	if err == nil || err.Error() != "amount invalid" {
+		t.Fatalf("SplitTokens() error = %v, want %q", err, "amount invalid")
+	}
+
+	_, err = relayClient.SplitTokens("0x123", "abc")
+	if err == nil || !strings.Contains(err.Error(), "amount invalid") {
+		t.Fatalf("SplitTokens() error = %v, want contains %q", err, "amount invalid")
+	}
+}
+
+func TestMergeTokens(t *testing.T) {
+	relayClient := &relayer.RelayClient{}
+
+	_, err := relayClient.MergeTokens("", "1")
+	if err == nil || err.Error() != "conditionId is empty" {
+		t.Fatalf("MergeTokens() error = %v, want %q", err, "conditionId is empty")
+	}
+
+	_, err = relayClient.MergeTokens("0x123", "")
+	if err == nil || err.Error() != "amount invalid" {
+		t.Fatalf("MergeTokens() error = %v, want %q", err, "amount invalid")
+	}
+
+	_, err = relayClient.MergeTokens("0x123", "abc")
+	if err == nil || !strings.Contains(err.Error(), "amount invalid") {
+		t.Fatalf("MergeTokens() error = %v, want contains %q", err, "amount invalid")
+	}
+}
+
+func TestSplitAndMergeLive(t *testing.T) {
+	config := polymarket.DefaultConfig()
+	config.Polymarket.BuilderCreds = &model.ApiKeyCreds{
+		Key:        os.Getenv("BUILDER_API_KEY"),
+		Secret:     os.Getenv("BUILDER_SECRET"),
+		Passphrase: os.Getenv("BUILDER_PASSPHRASE"),
+	}
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
+	conditionID := os.Getenv("CONDITIONID")
+	if conditionID == "" {
+		t.Fatal("CONDITIONID is required")
+	}
+
+	relayClient := relayer.NewRelayClient(config.Polymarket.RelayerBaseURL, config.Polymarket.OwnerKey, 137, config.Polymarket.BuilderCreds, nil, config.Polymarket.RelayerKey)
+
+	splitResult, err := relayClient.SplitTokens(conditionID, "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("split result: %+v", splitResult)
+
+	mergeResult, err := relayClient.MergeTokens(conditionID, "10")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("merge result: %+v", mergeResult)
 }

@@ -18,6 +18,7 @@ import (
 	Headers "github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
+	"github.com/xiangxn/go-polymarket-sdk/utils"
 	"resty.dev/v3"
 )
 
@@ -235,7 +236,7 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err2)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        constract.NegRiskExchangeV2,
+				To:        constract.NegRiskAdapter,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),
@@ -246,18 +247,89 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err3)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        constract.ExchangeV2,
+				To:        constract.ConditionalTokens,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),
 			})
 		}
 	}
-
 	resp, err := c.EexecuteSafeTransactions(redeemTxs)
 	if err != nil {
 		return nil, err
 	}
 	log.Printf("[RelayClient] Redeem: %+v", resp)
+	return resp, nil
+}
+
+func (c *RelayClient) SplitTokens(conditionId string, amount string) (*RelayerTransactionResponse, error) {
+	if conditionId == "" {
+		return nil, fmt.Errorf("conditionId is empty")
+	}
+	if amount == "" {
+		return nil, fmt.Errorf("amount invalid")
+	}
+	ctfABI, err := ctokens.ConditionalTokensMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ConditionalTokens ABI: %w", err)
+	}
+	value, err := utils.ParseUnits(amount, constants.CollateralTokenDecimals)
+	if err != nil {
+		return nil, fmt.Errorf("amount invalid: %w", err)
+	}
+	constract := pgc.GetContractConfig(c.chainId)
+	partition := []*big.Int{big.NewInt(1), big.NewInt(2)}
+
+	calldata, err := ctfABI.Pack("splitPosition", constract.CollateralToken, constants.HashZero, common.HexToHash(conditionId), partition, value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack splitPosition calldata: %w", err)
+	}
+	splitTx := SafeTransaction{
+		To:        constract.ConditionalTokens,
+		Operation: pgc.SafeOperationCall,
+		Data:      calldata,
+		Value:     big.NewInt(0),
+	}
+	resp, err := c.EexecuteSafeTransactions([]SafeTransaction{splitTx})
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("[RelayClient] split tokens: %+v", resp)
+	return resp, nil
+}
+
+func (c *RelayClient) MergeTokens(conditionId string, amount string) (*RelayerTransactionResponse, error) {
+	if conditionId == "" {
+		return nil, fmt.Errorf("conditionId is empty")
+	}
+	if amount == "" {
+		return nil, fmt.Errorf("amount invalid")
+	}
+	ctfABI, err := ctokens.ConditionalTokensMetaData.GetAbi()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse ConditionalTokens ABI: %w", err)
+	}
+	value, err := utils.ParseUnits(amount, constants.CollateralTokenDecimals)
+	if err != nil {
+		return nil, fmt.Errorf("amount invalid: %w", err)
+	}
+	constract := pgc.GetContractConfig(c.chainId)
+	partition := []*big.Int{big.NewInt(1), big.NewInt(2)}
+
+	calldata, err := ctfABI.Pack("mergePositions", constract.CollateralToken, constants.HashZero, common.HexToHash(conditionId), partition, value)
+	if err != nil {
+		return nil, fmt.Errorf("failed to pack mergePositions calldata: %w", err)
+	}
+	splitTx := SafeTransaction{
+		To:        constract.ConditionalTokens,
+		Operation: pgc.SafeOperationCall,
+		Data:      calldata,
+		Value:     big.NewInt(0),
+	}
+	resp, err := c.EexecuteSafeTransactions([]SafeTransaction{splitTx})
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("[RelayClient] merge tokens: %+v", resp)
 	return resp, nil
 }
