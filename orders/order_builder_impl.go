@@ -3,6 +3,7 @@ package orders
 import (
 	"crypto/ecdsa"
 	"fmt"
+	"log"
 	"math/big"
 	"time"
 
@@ -38,6 +39,7 @@ func NewOrderBuilderImpl(chainId *big.Int, saltGenerator func() int64) *OrderBui
 func (e *OrderBuilderImpl) BuildSignedOrder(privateKey *ecdsa.PrivateKey, orderData *OrderData, contract VerifyingContract) (*SignedOrder, error) {
 	order, err := e.BuildOrder(orderData)
 	if err != nil {
+		log.Printf("BuildOrder: %+v", err)
 		return nil, err
 	}
 	// log.Printf("order: %+v", order)
@@ -167,8 +169,8 @@ func (e *OrderBuilderImpl) BuildOrderHash(order *Order, contract VerifyingContra
 		},
 		Message: etheip712.TypedDataMessage{
 			"salt":          order.Salt,
-			"maker":         order.Maker,
-			"signer":        order.Signer,
+			"maker":         order.Maker.Hex(),
+			"signer":        order.Signer.Hex(),
 			"tokenId":       order.TokenId,
 			"makerAmount":   order.MakerAmount,
 			"takerAmount":   order.TakerAmount,
