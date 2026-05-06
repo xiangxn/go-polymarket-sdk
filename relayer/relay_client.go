@@ -236,7 +236,7 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err2)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        constract.NegRiskAdapter,
+				To:        constract.NegRiskCtfCollateralAdapter,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),
@@ -247,7 +247,7 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 				return nil, fmt.Errorf("failed to pack redeemPositions calldata: %w", err3)
 			}
 			redeemTxs = append(redeemTxs, SafeTransaction{
-				To:        constract.ConditionalTokens,
+				To:        constract.CtfCollateralAdapter,
 				Operation: pgc.SafeOperationCall,
 				Data:      calldata,
 				Value:     big.NewInt(0),
@@ -262,7 +262,7 @@ func (c *RelayClient) RedeemBatch(conditionIds []string, negRisks []bool, amount
 	return resp, nil
 }
 
-func (c *RelayClient) SplitTokens(conditionId string, amount string) (*RelayerTransactionResponse, error) {
+func (c *RelayClient) SplitTokens(conditionId string, amount string, negRisk bool) (*RelayerTransactionResponse, error) {
 	if conditionId == "" {
 		return nil, fmt.Errorf("conditionId is empty")
 	}
@@ -284,8 +284,12 @@ func (c *RelayClient) SplitTokens(conditionId string, amount string) (*RelayerTr
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack splitPosition calldata: %w", err)
 	}
+	cc := constants.CTF_COLLATERAL_ADAPTER
+	if negRisk {
+		cc = constants.CTF_COLLATERAL_ADAPTER_NEGRISK
+	}
 	splitTx := SafeTransaction{
-		To:        constract.ConditionalTokens,
+		To:        cc,
 		Operation: pgc.SafeOperationCall,
 		Data:      calldata,
 		Value:     big.NewInt(0),
@@ -298,7 +302,7 @@ func (c *RelayClient) SplitTokens(conditionId string, amount string) (*RelayerTr
 	return resp, nil
 }
 
-func (c *RelayClient) MergeTokens(conditionId string, amount string) (*RelayerTransactionResponse, error) {
+func (c *RelayClient) MergeTokens(conditionId string, amount string, negRisk bool) (*RelayerTransactionResponse, error) {
 	if conditionId == "" {
 		return nil, fmt.Errorf("conditionId is empty")
 	}
@@ -320,8 +324,12 @@ func (c *RelayClient) MergeTokens(conditionId string, amount string) (*RelayerTr
 	if err != nil {
 		return nil, fmt.Errorf("failed to pack mergePositions calldata: %w", err)
 	}
+	cc := constants.CTF_COLLATERAL_ADAPTER
+	if negRisk {
+		cc = constants.CTF_COLLATERAL_ADAPTER_NEGRISK
+	}
 	splitTx := SafeTransaction{
-		To:        constract.ConditionalTokens,
+		To:        cc,
 		Operation: pgc.SafeOperationCall,
 		Data:      calldata,
 		Value:     big.NewInt(0),
