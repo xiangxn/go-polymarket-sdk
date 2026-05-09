@@ -10,7 +10,8 @@ import (
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
-func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *RoundConfig) (Side, float64, float64) {
+func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *RoundConfig) (Side, string, string) {
+	// log.Printf("price: %.18f, size: %.18f", price, size)
 	rawPrice := utils.RoundNormal(price, roundConfig.Price)
 
 	if side == BUY {
@@ -18,47 +19,48 @@ func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *Rou
 		rawTakerAmt := utils.RoundDown(size, roundConfig.Size)
 
 		// log.Printf("rawTakerAmt: %f, size: %f, Amount: %d", rawTakerAmt, size, roundConfig.Amount)
-		rawMakerAmt := rawTakerAmt * rawPrice
+		rawMakerAmt := rawTakerAmt.Mul(rawPrice)
 		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
-
 		// log.Printf("rawMakerAmt: %f", rawMakerAmt)
-		return BUY, rawMakerAmt, rawTakerAmt
+		return BUY, rawMakerAmt.Truncate(int32(roundConfig.Amount)).String(), rawTakerAmt.Truncate(int32(roundConfig.Size)).String()
 
 	} else {
 		rawMakerAmt := utils.RoundDown(size, roundConfig.Size)
 
-		rawTakerAmt := rawMakerAmt * rawPrice
+		rawTakerAmt := rawMakerAmt.Mul(rawPrice)
+		// log.Printf("rawTakerAmt0: %.18f, size: %.18f, Amount: %d, rawMakerAmt: %.18f, rawPrice: %.18f", rawTakerAmt.InexactFloat64(), size, roundConfig.Amount, rawMakerAmt.InexactFloat64(), rawPrice.InexactFloat64())
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+		// log.Printf("rawTakerAmt0: %.18f, size: %.18f, Amount: %d, rawMakerAmt: %.18f, rawPrice: %.18f", rawTakerAmt.InexactFloat64(), size, roundConfig.Amount, rawMakerAmt.InexactFloat64(), rawPrice.InexactFloat64())
 
-		return SELL, rawMakerAmt, rawTakerAmt
+		return SELL, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
 	}
 }
 
-func GetMarketOrderRawAmounts(side Side, amount float64, price float64, roundConfig *RoundConfig) (Side, float64, float64) {
+func GetMarketOrderRawAmounts(side Side, amount float64, price float64, roundConfig *RoundConfig) (Side, string, string) {
 	// force 2 decimals places
 	rawPrice := utils.RoundDown(price, roundConfig.Price)
 
 	if side == BUY {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
-		rawTakerAmt := rawMakerAmt / rawPrice
+		rawTakerAmt := rawMakerAmt.Div(rawPrice)
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-		return BUY, rawMakerAmt, rawTakerAmt
+		return BUY, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
 	} else {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
-		rawTakerAmt := rawMakerAmt * rawPrice
+		rawTakerAmt := rawMakerAmt.Mul(rawPrice)
 		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
-		return SELL, rawMakerAmt, rawTakerAmt
+		return SELL, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
 	}
 }
 
 func BuildOrderCreationArgs(signer string, maker string, signatureType SignatureType, userOrder *UserOrder, roundConfig *RoundConfig) (*OrderData, error) {
 	side, rawMakerAmt, rawTakerAmt := GetOrderRawAmounts(userOrder.Side, userOrder.Size, userOrder.Price, roundConfig)
-	// log.Printf("BuildOrderCreationArgs rawMakerAmt: %f, rawTakerAmt: %f", rawMakerAmt, rawTakerAmt)
-	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
+	// log.Printf("BuildOrderCreationArgs rawMakerAmt: %.18f, rawTakerAmt: %.18f", rawMakerAmt, rawTakerAmt)
+	makerAmount, err := utils.ParseUnits(rawMakerAmt, constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
-	takerAmount, err := utils.ParseUnits(utils.FloatToString(rawTakerAmt, 0), constants.CollateralTokenDecimals)
+	takerAmount, err := utils.ParseUnits(rawTakerAmt, constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
@@ -88,11 +90,11 @@ func BuildMarketOrderCreationArgs(signer string, maker string, signatureType Sig
 		inputPrice = 1
 	}
 	side, rawMakerAmt, rawTakerAmt := GetMarketOrderRawAmounts(userMarketOrder.Side, userMarketOrder.Amount, inputPrice, roundConfig)
-	makerAmount, err := utils.ParseUnits(utils.FloatToString(rawMakerAmt, 0), constants.CollateralTokenDecimals)
+	makerAmount, err := utils.ParseUnits(rawMakerAmt, constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}
-	takerAmount, err := utils.ParseUnits(utils.FloatToString(rawTakerAmt, 0), constants.CollateralTokenDecimals)
+	takerAmount, err := utils.ParseUnits(rawTakerAmt, constants.CollateralTokenDecimals)
 	if err != nil {
 		return nil, err
 	}

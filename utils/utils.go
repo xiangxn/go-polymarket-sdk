@@ -13,6 +13,10 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+type Roundable interface {
+	~float64 | decimal.Decimal
+}
+
 func ToTimestamp(dateStr string) (int64, error) {
 	t, err := time.Parse(time.RFC3339, dateStr)
 	if err != nil {
@@ -37,36 +41,70 @@ func RoundToMinutes(m int, date ...time.Time) int64 {
 	return rounded.Unix()
 }
 
-func RoundNormal(num float64, decimals int) float64 {
-	d := decimal.NewFromFloat(num)
-	scale := decimal.New(1, int32(-decimals))
-
-	return d.Div(scale).Round(0).Mul(scale).InexactFloat64()
+func AlreadyWithinScale(d decimal.Decimal, decimals int) bool {
+	// d = coeff * 10^exp, 小数位数约为 -exp（exp<=0时）
+	exp := d.Exponent()
+	if exp >= 0 {
+		return true // 整数或更粗粒度
+	}
+	return int(-exp) <= decimals
 }
 
-func RoundDown(num float64, decimals int) float64 {
-	// if DecimalPlaces(num) <= decimals {
-	// 	log.Printf("1 === decimals: %d", decimals)
-	// 	return num
-	// }
-	// multiplier := math.Pow10(decimals)
-	// return math.Floor(num*multiplier) / multiplier
+func RoundNormal[T Roundable](num T, decimals int) decimal.Decimal {
+	var d decimal.Decimal
+	switch v := any(num).(type) {
+	case float64:
+		d = decimal.NewFromFloat(v)
+	case decimal.Decimal:
+		d = v
+	default:
+		panic("unsupported type")
+	}
 
-	d := decimal.NewFromFloat(num)
+	if AlreadyWithinScale(d, decimals) {
+		return d
+	}
+
 	scale := decimal.New(1, int32(-decimals))
-	return d.Div(scale).Floor().Mul(scale).InexactFloat64()
+	return d.Div(scale).Round(0).Mul(scale)
 }
 
-func RoundUp(num float64, decimals int) float64 {
-	// if DecimalPlaces(num) <= decimals {
-	// 	return num
-	// }
-	// multiplier := math.Pow10(decimals)
-	// return math.Ceil(num*multiplier) / multiplier
+func RoundDown[T Roundable](num T, decimals int) decimal.Decimal {
+	var d decimal.Decimal
+	switch v := any(num).(type) {
+	case float64:
+		d = decimal.NewFromFloat(v)
+	case decimal.Decimal:
+		d = v
+	default:
+		panic("unsupported type")
+	}
 
-	d := decimal.NewFromFloat(num)
+	if AlreadyWithinScale(d, decimals) {
+		return d
+	}
+
 	scale := decimal.New(1, int32(-decimals))
-	return d.Div(scale).Ceil().Mul(scale).InexactFloat64()
+	return d.Div(scale).Floor().Mul(scale)
+}
+
+func RoundUp[T Roundable](num T, decimals int) decimal.Decimal {
+	var d decimal.Decimal
+	switch v := any(num).(type) {
+	case float64:
+		d = decimal.NewFromFloat(v)
+	case decimal.Decimal:
+		d = v
+	default:
+		panic("unsupported type")
+	}
+
+	if AlreadyWithinScale(d, decimals) {
+		return d
+	}
+
+	scale := decimal.New(1, int32(-decimals))
+	return d.Div(scale).Ceil().Mul(scale)
 }
 
 func ParseUnits(amount string, decimals int) (*big.Int, error) {

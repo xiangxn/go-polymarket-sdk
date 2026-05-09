@@ -5,11 +5,25 @@ import (
 	"os"
 	"testing"
 
+	"github.com/shopspring/decimal"
 	"github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 	"github.com/xiangxn/go-polymarket-sdk/polymarket"
 )
+
+func FloatToStringByScale(num float64, scale int) string {
+	d := decimal.NewFromFloat(num).Round(int32(scale))
+	return d.StringFixedBank(int32(scale)) // 或 StringFixed
+}
+
+func TestF2S(t *testing.T) {
+	a := FloatToStringByScale(0.03, 5)
+	b := FloatToStringByScale(0.0312345, 5)
+	c := FloatToStringByScale(0.0312545, 5)
+	d := FloatToStringByScale(0.0312595, 5)
+	t.Logf("a: %s, b: %s, c: %s, d: %s", a, b, c, d)
+}
 
 func TestCreateOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
@@ -20,9 +34,9 @@ func TestCreateOrder(t *testing.T) {
 	signatureType := orders.POLY_PROXY
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: "24762431047507049460785923962525415896557183202961867581065585559228045929655",
-		Price:   0.5,
-		Size:    1.0,
-		Side:    orders.BUY,
+		Price:   0.03,
+		Size:    30.0,
+		Side:    orders.SELL,
 	}, orders.CreateOrderOptions{
 		TickSize:      &tickSize,
 		SignatureType: &signatureType,
@@ -31,6 +45,8 @@ func TestCreateOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Logf("order: %+v", order)
+	orderPayload := orders.OrderToDTO(order, "614db9ff-874b-581b-60b3-e264e5fa4888", orders.GTC, false, "0")
+	t.Logf("orderPayload: %+v", orderPayload)
 }
 
 func TestCreateMarketOrder(t *testing.T) {
