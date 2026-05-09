@@ -33,9 +33,7 @@ type RelayClient struct {
 }
 
 func NewRelayClient(relayerUrl string, signerKey string, chainId int64, builderCreds *model.ApiKeyCreds, safeContractConfig *SafeContractConfig, relayerKey *Headers.RelayerKey) *RelayClient {
-	if strings.HasPrefix(signerKey, "0x") {
-		signerKey = signerKey[2:]
-	}
+	signerKey = strings.TrimPrefix(signerKey, "0x")
 	privateKey, err := crypto.HexToECDSA(signerKey)
 	if err != nil {
 		panic(err)
