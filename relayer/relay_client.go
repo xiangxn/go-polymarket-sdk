@@ -188,7 +188,11 @@ func (c *RelayClient) EexecuteSafeTransactions(txns []SafeTransaction) (*Relayer
 	if c.relayerKey != nil {
 		relayerHeaders = Headers.CreateRelayerHeaders(c.relayerKey)
 		if relayerHeaders != nil {
-			maps.Copy(builderHeaders, relayerHeaders)
+			if builderHeaders == nil {
+				builderHeaders = relayerHeaders
+			} else {
+				maps.Copy(builderHeaders, relayerHeaders)
+			}
 		}
 	}
 	resp, err := c.Post(url, body, builderHeaders)
