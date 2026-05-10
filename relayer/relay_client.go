@@ -8,6 +8,7 @@ import (
 	"math/big"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	pgc "github.com/ivanzzeth/polymarket-go-contracts/v2"
@@ -341,5 +342,59 @@ func (c *RelayClient) MergeTokens(conditionId string, amount string, negRisk boo
 		return nil, err
 	}
 	log.Printf("[RelayClient] merge tokens: %+v", resp)
+	return resp, nil
+}
+
+func (c *RelayClient) Transfer(erc20Address string, to string, amount string, decimals int) (*RelayerTransactionResponse, error) {
+	erc20Abi, err := abi.JSON(strings.NewReader(ERC20TransferJSON))
+	if err != nil {
+		return nil, err
+	}
+	amt, err := utils.ParseUnits(amount, decimals)
+	if err != nil {
+		return nil, err
+	}
+	calldata, err := erc20Abi.Pack("transfer", common.HexToAddress(to), amt)
+	if err != nil {
+		return nil, err
+	}
+	transferTx := SafeTransaction{
+		To:        common.HexToAddress(erc20Address),
+		Operation: pgc.SafeOperationCall,
+		Data:      calldata,
+		Value:     big.NewInt(0),
+	}
+	resp, err := c.EexecuteSafeTransactions([]SafeTransaction{transferTx})
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("[RelayClient] transfer tokens: %+v", resp)
+	return resp, nil
+}
+
+func (c *RelayClient) Approve(erc20Address string, spender string, value string, decimals int) (*RelayerTransactionResponse, error) {
+	erc20Abi, err := abi.JSON(strings.NewReader(ERC20TransferJSON))
+	if err != nil {
+		return nil, err
+	}
+	amt, err := utils.ParseUnits(value, decimals)
+	if err != nil {
+		return nil, err
+	}
+	calldata, err := erc20Abi.Pack("approve", common.HexToAddress(spender), amt)
+	if err != nil {
+		return nil, err
+	}
+	approveTx := SafeTransaction{
+		To:        common.HexToAddress(erc20Address),
+		Operation: pgc.SafeOperationCall,
+		Data:      calldata,
+		Value:     big.NewInt(0),
+	}
+	resp, err := c.EexecuteSafeTransactions([]SafeTransaction{approveTx})
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("[RelayClient] transfer tokens: %+v", resp)
 	return resp, nil
 }
