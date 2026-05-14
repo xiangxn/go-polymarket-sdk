@@ -26,23 +26,23 @@ type MarketMonitor struct {
 	muSubsTokens     sync.RWMutex
 	pmClient         *PolymarketClient
 
-	orderBookCh chan OrderBook
+	orderBookCh chan *OrderBook
 }
 
 func NewMarketMonitor(wsBaseUrl string, client *PolymarketClient) *MarketMonitor {
 	return &MarketMonitor{
 		orderBooks:       make(map[string]*OrderBook),
-		orderBookCh:      make(chan OrderBook, 4096),
+		orderBookCh:      make(chan *OrderBook, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
 	}
 }
 
-func (mm *MarketMonitor) Subscribe() <-chan OrderBook {
+func (mm *MarketMonitor) Subscribe() <-chan *OrderBook {
 	return mm.orderBookCh
 }
 
-func (mm *MarketMonitor) emitOrderBook(orderBook OrderBook) {
+func (mm *MarketMonitor) emitOrderBook(orderBook *OrderBook) {
 	select {
 	case mm.orderBookCh <- orderBook:
 	default:
@@ -124,7 +124,7 @@ func (pm *MarketMonitor) handleMessage(msg string) {
 	// 	bestAsk.Size = lastAsk.Get("size").Float()
 	// }
 	pm.updateOrderBook(&book)
-	pm.emitOrderBook(book)
+	pm.emitOrderBook(&book)
 }
 
 // Disconnect 断开 WS
