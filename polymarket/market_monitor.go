@@ -27,14 +27,18 @@ type MarketMonitor struct {
 	pmClient         *PolymarketClient
 
 	orderBookCh chan *OrderBook
+
+	// 是否存储Orderbook,如果为false时，需要使用者在外部存储
+	isStore bool
 }
 
-func NewMarketMonitor(wsBaseUrl string, client *PolymarketClient) *MarketMonitor {
+func NewMarketMonitor(wsBaseUrl string, isStore bool, client *PolymarketClient) *MarketMonitor {
 	return &MarketMonitor{
 		orderBooks:       make(map[string]*OrderBook),
 		orderBookCh:      make(chan *OrderBook, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
+		isStore:          isStore,
 	}
 }
 
@@ -210,6 +214,10 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 }
 
 func (pm *MarketMonitor) updateOrderBook(orderBook *OrderBook) {
+	if !pm.isStore {
+		return
+	}
+
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 
