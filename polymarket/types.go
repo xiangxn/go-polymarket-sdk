@@ -37,11 +37,14 @@ type OrderBookSummary struct {
 }
 
 type OrderBook struct {
-	Market    string        `json:"market"`
-	AssetId   string        `json:"asset_id"`
-	Timestamp int64         `json:"timestamp"`
-	Bids      []orders.Book `json:"bids"`
-	Asks      []orders.Book `json:"asks"`
+	Market  string `json:"market"`
+	AssetId string `json:"asset_id"`
+	// 触发时间戳，毫秒
+	Timestamp int64 `json:"timestamp"`
+	// 接收延迟，毫秒
+	Latency int64         `json:"latency,omitempty"`
+	Bids    []orders.Book `json:"bids"`
+	Asks    []orders.Book `json:"asks"`
 }
 
 type BookParams struct {

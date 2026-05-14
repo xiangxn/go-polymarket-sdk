@@ -96,6 +96,7 @@ func (pm *MarketMonitor) handleMessage(msg string) {
 	book.Market = gjson.Get(msg, "market").String()
 	book.AssetId = gjson.Get(msg, "asset_id").String()
 	book.Timestamp = gjson.Get(msg, "timestamp").Int()
+	book.Latency = time.Now().UnixMilli() - book.Timestamp // 计算接收延迟
 	bids := gjson.Get(msg, "bids").Array()
 	for _, v := range bids {
 		price, _ := strconv.ParseFloat(v.Get("price").String(), 64)
@@ -220,6 +221,7 @@ func (pm *MarketMonitor) updateOrderBook(orderBook *OrderBook) {
 	}
 	ob.Market = orderBook.Market
 	ob.Timestamp = orderBook.Timestamp
+	ob.Latency = orderBook.Latency
 	ob.Bids = append(ob.Bids[:0], orderBook.Bids...)
 	ob.Asks = append(ob.Asks[:0], orderBook.Asks...)
 }
@@ -246,6 +248,7 @@ func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
 			Market:    orderBook.Market,
 			AssetId:   orderBook.AssetId,
 			Timestamp: orderBook.Timestamp,
+			Latency:   time.Now().UnixMilli() - orderBook.Timestamp, // 计算接收延迟
 		}
 		ob.Bids = append(ob.Bids, orderBook.Bids...)
 		ob.Asks = append(ob.Asks, orderBook.Asks...)
@@ -253,14 +256,17 @@ func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
 	}
 }
 
-func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (*OrderBook, error) {
+func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (OrderBook, error) {
 	pm.mu.RLock()
 	defer pm.mu.RUnlock()
 
 	if orderBook, ok := pm.orderBooks[tokenID]; ok {
-		return orderBook, nil
+		ob := *orderBook
+		ob.Bids = append(ob.Bids, orderBook.Bids...)
+		ob.Asks = append(ob.Asks, orderBook.Asks...)
+		return ob, nil
 	}
-	return nil, fmt.Errorf("[MarketMonitor] token price not found for %s", tokenID)
+	return OrderBook{}, fmt.Errorf("[MarketMonitor] token price not found for %s", tokenID)
 }
 
 func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
