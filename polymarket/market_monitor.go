@@ -36,8 +36,7 @@ type MarketMonitor struct {
 	ws utils.WSClient
 
 	// tokenId => immutable snapshot store
-	orderBooks map[string]*BookStore
-	mu         sync.RWMutex
+	orderBooks sync.Map
 
 	clobMarketWSSURL string
 
@@ -60,7 +59,6 @@ func NewMarketMonitor(
 ) *MarketMonitor {
 
 	return &MarketMonitor{
-		orderBooks:       make(map[string]*BookStore),
 		orderBookCh:      make(chan *OrderBook, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
@@ -187,22 +185,12 @@ func (pm *MarketMonitor) updateOrderBook(book *OrderBook) {
 		return
 	}
 
-	pm.mu.RLock()
+	value, _ := pm.orderBooks.LoadOrStore(
+		book.AssetId,
+		&BookStore{},
+	)
 
-	store, ok := pm.orderBooks[book.AssetId]
-
-	pm.mu.RUnlock()
-
-	if !ok {
-
-		pm.mu.Lock()
-		store, ok = pm.orderBooks[book.AssetId]
-		if !ok {
-			store = &BookStore{}
-			pm.orderBooks[book.AssetId] = store
-		}
-		pm.mu.Unlock()
-	}
+	store := value.(*BookStore)
 
 	old := store.Load()
 
@@ -234,11 +222,9 @@ func (pm *MarketMonitor) Disconnect() {
 // Reset
 func (pm *MarketMonitor) Reset() {
 
-	pm.mu.Lock()
 	for _, t := range pm.subsTokens {
-		delete(pm.orderBooks, t)
+		pm.orderBooks.Delete(t)
 	}
-	pm.mu.Unlock()
 
 	pm.muSubsTokens.Lock()
 	pm.subsTokens = nil
@@ -266,12 +252,10 @@ func (pm *MarketMonitor) UnsubscribeTokens(tokens ...string) {
 	tokenSet := make(map[string]struct{}, len(tokens))
 
 	if pm.isStore {
-		pm.mu.Lock()
 		for _, t := range tokens {
 			tokenSet[t] = struct{}{}
-			delete(pm.orderBooks, t)
+			pm.orderBooks.Delete(t)
 		}
-		pm.mu.Unlock()
 	} else {
 		for _, t := range tokens {
 			tokenSet[t] = struct{}{}
@@ -406,28 +390,17 @@ func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
 // immutable pointer
 func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (*OrderBook, error) {
 
-	pm.mu.RLock()
-
-	store, ok := pm.orderBooks[tokenID]
-
-	pm.mu.RUnlock()
+	value, ok := pm.orderBooks.Load(tokenID)
 
 	if !ok {
-		return nil,
-			fmt.Errorf(
-				"[MarketMonitor] token not found: %s",
-				tokenID,
-			)
+		return nil, fmt.Errorf("[MarketMonitor] token not found: %s", tokenID)
 	}
 
+	store := value.(*BookStore)
 	book := store.Load()
 
 	if book == nil {
-		return nil,
-			fmt.Errorf(
-				"[MarketMonitor] token empty: %s",
-				tokenID,
-			)
+		return nil, fmt.Errorf("[MarketMonitor] token empty: %s", tokenID)
 	}
 
 	return book, nil
