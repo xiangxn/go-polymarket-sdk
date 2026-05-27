@@ -330,63 +330,6 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 	//go pm.fetchOrderbooks(subs...)
 }
 
-// REST snapshot
-func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
-
-	if len(tokens) == 0 {
-		return
-	}
-
-	params := make([]BookParams, 0, len(tokens))
-
-	for _, token := range tokens {
-
-		params = append(params, BookParams{
-			TokenId: token,
-		})
-	}
-
-	orderBooks, err := pm.pmClient.GetOrderBooks(params)
-
-	if err != nil {
-
-		log.Printf(
-			"[MarketMonitor] fetch orderbooks failed: %v",
-			err,
-		)
-
-		return
-	}
-
-	for _, src := range orderBooks {
-
-		book := &OrderBook{
-			Market:    src.Market,
-			AssetId:   src.AssetId,
-			Timestamp: src.Timestamp,
-			Latency:   time.Now().UnixMilli() - src.Timestamp,
-		}
-
-		if len(src.Bids) > 0 {
-
-			book.Bids =
-				make([]orders.Book, len(src.Bids))
-
-			copy(book.Bids, src.Bids)
-		}
-
-		if len(src.Asks) > 0 {
-
-			book.Asks =
-				make([]orders.Book, len(src.Asks))
-
-			copy(book.Asks, src.Asks)
-		}
-
-		pm.updateOrderBook(book)
-	}
-}
-
 // immutable pointer
 func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (*OrderBook, error) {
 
