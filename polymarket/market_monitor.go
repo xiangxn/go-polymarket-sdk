@@ -1,14 +1,12 @@
 package polymarket
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
-	"slices"
-	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/tidwall/gjson"
@@ -16,25 +14,53 @@ import (
 	"github.com/xiangxn/go-polymarket-sdk/utils"
 )
 
+type BookStore struct {
+	v          atomic.Value // *OrderBook
+	lastUpdate int64
+}
+
+func (bs *BookStore) Load() *OrderBook {
+	v := bs.v.Load()
+	if v == nil {
+		return nil
+	}
+	return v.(*OrderBook)
+}
+
+func (bs *BookStore) Store(book *OrderBook) {
+	bs.lastUpdate = time.Now().UnixMilli()
+	bs.v.Store(book)
+}
+
 type MarketMonitor struct {
 	ws utils.WSClient
-	// tokenId=>OrderBook
-	orderBooks       map[string]*OrderBook
-	mu               sync.RWMutex
-	clobMarketWSSURL string
-	subsTokens       []string
-	muSubsTokens     sync.RWMutex
-	pmClient         *PolymarketClient
 
+	// tokenId => immutable snapshot store
+	orderBooks map[string]*BookStore
+	mu         sync.RWMutex
+
+	clobMarketWSSURL string
+
+	subsTokens   []string
+	muSubsTokens sync.RWMutex
+
+	pmClient *PolymarketClient
+
+	// downstream consumer channel
 	orderBookCh chan *OrderBook
 
-	// 是否存储Orderbook,如果为false时，需要使用者在外部存储
+	// 是否存储Orderbook
 	isStore bool
 }
 
-func NewMarketMonitor(wsBaseUrl string, isStore bool, client *PolymarketClient) *MarketMonitor {
+func NewMarketMonitor(
+	wsBaseUrl string,
+	isStore bool,
+	client *PolymarketClient,
+) *MarketMonitor {
+
 	return &MarketMonitor{
-		orderBooks:       make(map[string]*OrderBook),
+		orderBooks:       make(map[string]*BookStore),
 		orderBookCh:      make(chan *OrderBook, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
@@ -46,11 +72,25 @@ func (mm *MarketMonitor) Subscribe() <-chan *OrderBook {
 	return mm.orderBookCh
 }
 
-func (mm *MarketMonitor) emitOrderBook(orderBook *OrderBook) {
+func (mm *MarketMonitor) emitOrderBook(book *OrderBook) {
+
+	// drop oldest
 	select {
-	case mm.orderBookCh <- orderBook:
+	case mm.orderBookCh <- book:
+		return
+
 	default:
-		log.Println("[MarketMonitor] fill channel full, dropping fill")
+	}
+
+	select {
+	case <-mm.orderBookCh:
+	default:
+	}
+
+	select {
+	case mm.orderBookCh <- book:
+	default:
+		log.Println("[MarketMonitor] orderBookCh full")
 	}
 }
 
@@ -58,8 +98,9 @@ func (pm *MarketMonitor) GetClient() *PolymarketClient {
 	return pm.pmClient
 }
 
-// Run 启动 WebSocket 监听
+// Run 启动 WS
 func (pm *MarketMonitor) Run(ctx context.Context) error {
+
 	log.Println("[MarketMonitor] Run start")
 	defer log.Println("[MarketMonitor] Run exit")
 
@@ -67,12 +108,15 @@ func (pm *MarketMonitor) Run(ctx context.Context) error {
 		return nil
 	}
 
-	pm.ws = utils.NewWSClient(utils.WSConfig{
-		URL:          pm.clobMarketWSSURL,
-		PingInterval: 10 * time.Second,
-		Reconnect:    true,
-		MaxReconnect: 20,
-	}, pm)
+	pm.ws = utils.NewWSClient(
+		utils.WSConfig{
+			URL:          pm.clobMarketWSSURL,
+			PingInterval: 10 * time.Second,
+			Reconnect:    true,
+			MaxReconnect: 20,
+		},
+		pm,
+	)
 
 	if err := pm.ws.Run(ctx); err != nil {
 		pm.Disconnect()
@@ -80,259 +124,373 @@ func (pm *MarketMonitor) Run(ctx context.Context) error {
 	}
 
 	pm.Disconnect()
+
 	return ctx.Err()
 }
 
-// handleMessage 解析消息并发送 Tick
-func (pm *MarketMonitor) handleMessage(msg string) {
+// 高频热路径
+func (pm *MarketMonitor) handleMessage(msg []byte) {
+
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("[MarketMonitor] handleMessage panic: %v", r)
 		}
 	}()
 
-	eventType := gjson.Get(msg, "event_type").String()
-	if eventType != "book" {
+	result := gjson.ParseBytes(msg)
+
+	if result.Get("event_type").String() != "book" {
 		return
 	}
 
-	var book OrderBook
-	book.Market = gjson.Get(msg, "market").String()
-	book.AssetId = gjson.Get(msg, "asset_id").String()
-	book.Timestamp = gjson.Get(msg, "timestamp").Int()
-	book.Latency = time.Now().UnixMilli() - book.Timestamp // 计算接收延迟
-	bids := gjson.Get(msg, "bids").Array()
-	for _, v := range bids {
-		price, _ := strconv.ParseFloat(v.Get("price").String(), 64)
-		size, _ := strconv.ParseFloat(v.Get("size").String(), 64)
-		book.Bids = append(book.Bids, orders.Book{Price: price, Size: size})
-	}
-	asks := gjson.Get(msg, "asks").Array()
-	for _, v := range asks {
-		price, _ := strconv.ParseFloat(v.Get("price").String(), 64)
-		size, _ := strconv.ParseFloat(v.Get("size").String(), 64)
-		book.Asks = append(book.Asks, orders.Book{Price: price, Size: size})
+	book := &OrderBook{}
+	book.Market = result.Get("market").String()
+	book.AssetId = result.Get("asset_id").String()
+	book.Timestamp = result.Get("timestamp").Int()
+	book.Latency = time.Now().UnixMilli() - book.Timestamp
+
+	// bids
+	bids := result.Get("bids").Array()
+
+	if len(bids) > 0 {
+		book.Bids = make([]orders.Book, 0, len(bids))
+		for _, v := range bids {
+			book.Bids = append(book.Bids, orders.Book{
+				Price: v.Get("price").Float(),
+				Size:  v.Get("size").Float(),
+			})
+		}
 	}
 
-	// var bestBid, bestAsk orders.Book
-	// if len(bids) > 0 {
-	// 	// lastBid := Bids[len(Bids)-1]
-	// 	lastBid := slices.MaxFunc(bids, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
-	// 	bestBid.Price = lastBid.Get("price").Float()
-	// 	bestBid.Size = lastBid.Get("size").Float()
-	// }
-	// if len(asks) > 0 {
-	// 	// lastAsk := Asks[len(Asks)-1]
-	// 	lastAsk := slices.MinFunc(asks, func(a, b gjson.Result) int { return cmp.Compare(a.Get("price").Float(), b.Get("price").Float()) })
-	// 	bestAsk.Price = lastAsk.Get("price").Float()
-	// 	bestAsk.Size = lastAsk.Get("size").Float()
-	// }
-	pm.updateOrderBook(&book)
-	pm.emitOrderBook(&book)
+	// asks
+	asks := result.Get("asks").Array()
+
+	if len(asks) > 0 {
+		book.Asks = make([]orders.Book, 0, len(asks))
+		for _, v := range asks {
+			book.Asks = append(book.Asks, orders.Book{
+				Price: v.Get("price").Float(),
+				Size:  v.Get("size").Float(),
+			})
+		}
+	}
+
+	pm.updateOrderBook(book)
+
+	pm.emitOrderBook(book)
 }
 
-// Disconnect 断开 WS
+// immutable snapshot store
+func (pm *MarketMonitor) updateOrderBook(book *OrderBook) {
+
+	if !pm.isStore {
+		return
+	}
+
+	pm.mu.RLock()
+
+	store, ok := pm.orderBooks[book.AssetId]
+
+	pm.mu.RUnlock()
+
+	if !ok {
+
+		pm.mu.Lock()
+		store, ok = pm.orderBooks[book.AssetId]
+		if !ok {
+			store = &BookStore{}
+			pm.orderBooks[book.AssetId] = store
+		}
+		pm.mu.Unlock()
+	}
+
+	old := store.Load()
+
+	// 防止多worker乱序回滚
+	if old != nil {
+
+		if book.Timestamp < old.Timestamp {
+			return
+		}
+	}
+
+	store.Store(book)
+}
+
+// Disconnect
 func (pm *MarketMonitor) Disconnect() {
+
 	pm.muSubsTokens.Lock()
 	defer pm.muSubsTokens.Unlock()
 
 	if pm.ws != nil {
-		pm.ws.Close()
+		_ = pm.ws.Close()
 		pm.ws = nil
 	}
+
 	pm.subsTokens = nil
 }
 
+// Reset
 func (pm *MarketMonitor) Reset() {
+
+	pm.mu.Lock()
+	for _, t := range pm.subsTokens {
+		delete(pm.orderBooks, t)
+	}
+	pm.mu.Unlock()
+
 	pm.muSubsTokens.Lock()
 	pm.subsTokens = nil
 	pm.muSubsTokens.Unlock()
 
 	if pm.ws != nil {
-		pm.ws.Reset()
+		_ = pm.ws.Reset()
 	}
 }
 
-// SubscribeTokens 订阅市场数据 (导出的方法)
+// SubscribeTokens
 func (pm *MarketMonitor) SubscribeTokens(tokens ...string) {
 	pm.subscribeToMarket(tokens...)
 }
 
 func (pm *MarketMonitor) UnsubscribeTokens(tokens ...string) {
-	pm.muSubsTokens.Lock()
-	defer pm.muSubsTokens.Unlock()
-
-	if len(tokens) > 0 {
-		for _, token := range tokens {
-			// 从订阅列表中移除
-			for i, t := range pm.subsTokens {
-				if t == token {
-					pm.subsTokens = append(pm.subsTokens[:i], pm.subsTokens[i+1:]...)
-					break
-				}
-			}
-		}
-	}
-}
-
-func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
-	pm.fetchOrderbooks(tokens...)
 
 	pm.muSubsTokens.Lock()
 	defer pm.muSubsTokens.Unlock()
 
-	if len(tokens) > 0 {
-		pm.subsTokens = append(pm.subsTokens, tokens...)
-		// 去重
-		tokenSet := make(map[string]bool)
-		for _, token := range pm.subsTokens {
-			tokenSet[token] = true
-		}
-		pm.subsTokens = make([]string, 0, len(tokenSet))
-		for token := range tokenSet {
-			pm.subsTokens = append(pm.subsTokens, token)
-		}
-	}
-
-	if len(pm.subsTokens) == 0 || pm.ws == nil || !pm.ws.IsAlive() {
-		return
-	}
-
-	subscribeMessage := MarketMessage{
-		Type:      "MARKET",
-		AssetsIDs: pm.subsTokens,
-	}
-
-	data, _ := json.Marshal(subscribeMessage)
-	err := pm.ws.Send(data)
-	if err != nil {
-		log.Printf("[MarketMonitor] 订阅市场失败: %v", err)
-		return
-	}
-
-	log.Printf("[MarketMonitor] 📡 已订阅市场: %v", pm.subsTokens)
-}
-
-func (pm *MarketMonitor) updateOrderBook(orderBook *OrderBook) {
-	if !pm.isStore {
-		return
-	}
-
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-
-	ob, ok := pm.orderBooks[orderBook.AssetId]
-	if !ok {
-		ob = &OrderBook{AssetId: orderBook.AssetId}
-		pm.orderBooks[orderBook.AssetId] = ob
-
-	}
-	ob.Market = orderBook.Market
-	ob.Timestamp = orderBook.Timestamp
-	ob.Latency = orderBook.Latency
-	ob.Bids = append(ob.Bids[:0], orderBook.Bids...)
-	ob.Asks = append(ob.Asks[:0], orderBook.Asks...)
-}
-
-func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
 	if len(tokens) == 0 {
 		return
 	}
-	var params []BookParams
-	for _, token := range tokens {
-		params = append(params, BookParams{TokenId: token})
+
+	tokenSet := make(map[string]struct{}, len(tokens))
+
+	if pm.isStore {
+		pm.mu.Lock()
+		for _, t := range tokens {
+			tokenSet[t] = struct{}{}
+			delete(pm.orderBooks, t)
+		}
+		pm.mu.Unlock()
+	} else {
+		for _, t := range tokens {
+			tokenSet[t] = struct{}{}
+		}
 	}
-	orderBooks, err := pm.pmClient.GetOrderBooks(params)
-	if err != nil {
-		log.Printf("[MarketMonitor] 获取订单簿失败: %v", err)
+
+	dst := pm.subsTokens[:0]
+
+	for _, t := range pm.subsTokens {
+
+		if _, remove := tokenSet[t]; !remove {
+			dst = append(dst, t)
+		}
+	}
+
+	pm.subsTokens = dst
+}
+
+func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
+
+	pm.muSubsTokens.Lock()
+
+	if len(tokens) > 0 {
+
+		pm.subsTokens = append(pm.subsTokens, tokens...)
+
+		// dedup
+		set := make(map[string]struct{})
+
+		dst := pm.subsTokens[:0]
+
+		for _, t := range pm.subsTokens {
+
+			if _, ok := set[t]; ok {
+				continue
+			}
+
+			set[t] = struct{}{}
+
+			dst = append(dst, t)
+		}
+
+		pm.subsTokens = dst
+	}
+
+	subs := append([]string(nil), pm.subsTokens...)
+
+	pm.muSubsTokens.Unlock()
+
+	if len(subs) == 0 ||
+		pm.ws == nil ||
+		!pm.ws.IsAlive() {
 		return
 	}
 
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
+	// 先WS订阅
+	subscribeMessage := MarketMessage{
+		Type:      "MARKET",
+		AssetsIDs: subs,
+	}
 
-	for _, orderBook := range orderBooks {
-		ob := &OrderBook{
-			Market:    orderBook.Market,
-			AssetId:   orderBook.AssetId,
-			Timestamp: orderBook.Timestamp,
-			Latency:   time.Now().UnixMilli() - orderBook.Timestamp, // 计算接收延迟
+	data, _ := json.Marshal(subscribeMessage)
+
+	if err := pm.ws.Send(data); err != nil {
+		log.Printf("[MarketMonitor] subscribe failed: %v", err)
+		return
+	}
+
+	log.Printf("[MarketMonitor] subscribed markets: %v", subs)
+
+	// 异步REST补快照，暂时无意义，所以注释掉
+	//go pm.fetchOrderbooks(subs...)
+}
+
+// REST snapshot
+func (pm *MarketMonitor) fetchOrderbooks(tokens ...string) {
+
+	if len(tokens) == 0 {
+		return
+	}
+
+	params := make([]BookParams, 0, len(tokens))
+
+	for _, token := range tokens {
+
+		params = append(params, BookParams{
+			TokenId: token,
+		})
+	}
+
+	orderBooks, err := pm.pmClient.GetOrderBooks(params)
+
+	if err != nil {
+
+		log.Printf(
+			"[MarketMonitor] fetch orderbooks failed: %v",
+			err,
+		)
+
+		return
+	}
+
+	for _, src := range orderBooks {
+
+		book := &OrderBook{
+			Market:    src.Market,
+			AssetId:   src.AssetId,
+			Timestamp: src.Timestamp,
+			Latency:   time.Now().UnixMilli() - src.Timestamp,
 		}
-		ob.Bids = append(ob.Bids, orderBook.Bids...)
-		ob.Asks = append(ob.Asks, orderBook.Asks...)
-		pm.orderBooks[orderBook.AssetId] = ob
+
+		if len(src.Bids) > 0 {
+
+			book.Bids =
+				make([]orders.Book, len(src.Bids))
+
+			copy(book.Bids, src.Bids)
+		}
+
+		if len(src.Asks) > 0 {
+
+			book.Asks =
+				make([]orders.Book, len(src.Asks))
+
+			copy(book.Asks, src.Asks)
+		}
+
+		pm.updateOrderBook(book)
 	}
 }
 
-func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (OrderBook, error) {
+// immutable pointer
+func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (*OrderBook, error) {
+
 	pm.mu.RLock()
-	defer pm.mu.RUnlock()
 
-	if orderBook, ok := pm.orderBooks[tokenID]; ok {
-		ob := *orderBook
-		ob.Bids = append(ob.Bids, orderBook.Bids...)
-		ob.Asks = append(ob.Asks, orderBook.Asks...)
-		return ob, nil
-	}
-	return OrderBook{}, fmt.Errorf("[MarketMonitor] token price not found for %s", tokenID)
-}
+	store, ok := pm.orderBooks[tokenID]
 
-func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
-	book, ok := pm.orderBooks[tokenID]
+	pm.mu.RUnlock()
+
 	if !ok {
-		return nil, fmt.Errorf("[%s] is no data yet.", tokenID)
+		return nil,
+			fmt.Errorf(
+				"[MarketMonitor] token not found: %s",
+				tokenID,
+			)
 	}
-	var bestBid, bestAsk orders.Book
-	bids := book.Bids
-	asks := book.Asks
-	if len(bids) > 0 {
-		// lastBid := Bids[len(Bids)-1]
-		lastBid := slices.MaxFunc(bids, func(a, b orders.Book) int { return cmp.Compare(a.Price, b.Price) })
-		bestBid.Price = lastBid.Price
-		bestBid.Size = lastBid.Size
+
+	book := store.Load()
+
+	if book == nil {
+		return nil,
+			fmt.Errorf(
+				"[MarketMonitor] token empty: %s",
+				tokenID,
+			)
 	}
-	if len(asks) > 0 {
-		// lastAsk := Asks[len(Asks)-1]
-		lastAsk := slices.MinFunc(asks, func(a, b orders.Book) int { return cmp.Compare(a.Price, b.Price) })
-		bestAsk.Price = lastAsk.Price
-		bestAsk.Size = lastAsk.Size
-	}
-	var data PriceData
-	data.TokenID = tokenID
-	data.BestBid = &bestBid
-	data.BestAsk = &bestAsk
-	data.Market = book.Market
-	data.Timestamp = book.Timestamp
-	return &data, nil
+
+	return book, nil
 }
 
-/***WSClient handler实现***/
+// 高频读取路径
+func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
+
+	book, err := pm.GetTokenOrderBook(tokenID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	var bestBid *orders.Book
+	var bestAsk *orders.Book
+
+	if len(book.Bids) > 0 {
+		bestBid = &book.Bids[len(book.Bids)-1]
+	}
+
+	if len(book.Asks) > 0 {
+		bestAsk = &book.Asks[len(book.Asks)-1]
+	}
+
+	return &PriceData{
+		TokenID:   tokenID,
+		BestBid:   bestBid,
+		BestAsk:   bestAsk,
+		Market:    book.Market,
+		Timestamp: book.Timestamp,
+	}, nil
+}
+
+/*** WSClient handlers ***/
 
 func (pm *MarketMonitor) OnOpen() {
-	log.Println("[MarketMonitor] WebSocket Connected")
+	log.Println("[MarketMonitor] WS connected")
 	pm.subscribeToMarket()
 }
 
 func (pm *MarketMonitor) OnReconnect() {
-	log.Println("[MarketMonitor] WebSocket Reconnect...")
-	// 清空数据，防止旧数据异常
-	pm.mu.Lock()
-	pm.orderBooks = make(map[string]*OrderBook)
-	pm.mu.Unlock()
-
+	log.Println("[MarketMonitor] WS reconnect")
 	pm.subscribeToMarket()
 }
 
 func (pm *MarketMonitor) OnError(err error) {
-	log.Println("[MarketMonitor] WebSocket Error:", err)
+	log.Println("[MarketMonitor] WS error:", err)
 }
 
 func (pm *MarketMonitor) OnClose() {
-	log.Println("[MarketMonitor] WebSocket Closed")
+	log.Println("[MarketMonitor] WS closed")
 }
 
 func (pm *MarketMonitor) OnMessage(msg []byte) {
-	if string(msg) != "PONG" {
-		pm.handleMessage(string(msg))
+	// 高频零alloc heartbeat
+	if len(msg) == 4 &&
+		msg[0] == 'P' &&
+		msg[1] == 'O' &&
+		msg[2] == 'N' &&
+		msg[3] == 'G' {
+		return
 	}
+
+	pm.handleMessage(msg)
 }
