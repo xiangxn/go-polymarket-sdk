@@ -381,21 +381,21 @@ func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
 /*** WSClient handlers ***/
 
 func (pm *MarketMonitor) OnOpen() {
-	log.Println("[MarketMonitor] WS connected")
+	log.Println("[MarketMonitor] WebSocket connected")
 	pm.subscribeToMarket()
 }
 
 func (pm *MarketMonitor) OnReconnect() {
-	log.Println("[MarketMonitor] WS reconnect")
+	log.Println("[MarketMonitor] WebSocket reconnect")
 	pm.subscribeToMarket()
 }
 
 func (pm *MarketMonitor) OnError(err error) {
-	log.Println("[MarketMonitor] WS error:", err)
+	log.Println("[MarketMonitor] WebSocket error:", err)
 }
 
 func (pm *MarketMonitor) OnClose() {
-	log.Println("[MarketMonitor] WS closed")
+	log.Println("[MarketMonitor] WebSocket closed")
 }
 
 func (pm *MarketMonitor) OnMessage(msg []byte) {
