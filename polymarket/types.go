@@ -70,8 +70,10 @@ type PriceUpdateCallback func(priceData *PriceData)
 
 // MarketMessage 市场订阅消息
 type MarketMessage struct {
-	Type      string   `json:"type"`
-	AssetsIDs []string `json:"assets_ids"`
+	Type                 string   `json:"type"`
+	AssetsIDs            []string `json:"assets_ids"`
+	CustomFeatureEnabled bool     `json:"custom_feature_enabled"`
+	InitialDump          bool     `json:"initial_dump"`
 }
 
 // WSMessage WebSocket消息

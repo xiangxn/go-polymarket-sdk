@@ -38,7 +38,8 @@ type MarketMonitor struct {
 	// tokenId => immutable snapshot store
 	orderBooks sync.Map
 
-	clobMarketWSSURL string
+	clobMarketWSSURL     string
+	customFeatureEnabled bool
 
 	subsTokens   []string
 	muSubsTokens sync.RWMutex
@@ -57,14 +58,16 @@ func NewMarketMonitor(
 	wsBaseUrl string,
 	isStore bool,
 	client *PolymarketClient,
+	customFeatureEnabled bool,
 ) *MarketMonitor {
 
 	return &MarketMonitor{
-		orderBookCh:      make(chan *OrderBook, 4096),
-		resolvedCh:       make(chan *ResolvedInfo, 4096),
-		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
-		pmClient:         client,
-		isStore:          isStore,
+		orderBookCh:          make(chan *OrderBook, 4096),
+		resolvedCh:           make(chan *ResolvedInfo, 4096),
+		clobMarketWSSURL:     fmt.Sprintf("%s/ws/market", wsBaseUrl),
+		pmClient:             client,
+		isStore:              isStore,
+		customFeatureEnabled: customFeatureEnabled,
 	}
 }
 
@@ -345,8 +348,9 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 
 	// 先WS订阅
 	subscribeMessage := MarketMessage{
-		Type:      "MARKET",
-		AssetsIDs: subs,
+		Type:                 "MARKET",
+		AssetsIDs:            subs,
+		CustomFeatureEnabled: pm.customFeatureEnabled,
 	}
 
 	data, _ := json.Marshal(subscribeMessage)
