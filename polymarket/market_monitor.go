@@ -47,6 +47,7 @@ type MarketMonitor struct {
 
 	// downstream consumer channel
 	orderBookCh chan *OrderBook
+	resolvedCh  chan *ResolvedInfo
 
 	// 是否存储Orderbook
 	isStore bool
@@ -60,6 +61,7 @@ func NewMarketMonitor(
 
 	return &MarketMonitor{
 		orderBookCh:      make(chan *OrderBook, 4096),
+		resolvedCh:       make(chan *ResolvedInfo, 4096),
 		clobMarketWSSURL: fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:         client,
 		isStore:          isStore,
@@ -68,6 +70,10 @@ func NewMarketMonitor(
 
 func (mm *MarketMonitor) Subscribe() <-chan *OrderBook {
 	return mm.orderBookCh
+}
+
+func (mm *MarketMonitor) SubscribeResolved() <-chan *ResolvedInfo {
+	return mm.resolvedCh
 }
 
 func (mm *MarketMonitor) emitOrderBook(book *OrderBook) {
@@ -137,18 +143,44 @@ func (pm *MarketMonitor) handleMessage(msg []byte) {
 
 	result := gjson.ParseBytes(msg)
 
-	if result.Get("event_type").String() != "book" {
-		return
+	event_type := result.Get("event_type").String()
+
+	switch event_type {
+	case "book":
+		pm.onOrderBook(&result)
+	case "market_resolved":
+		pm.onMarketResolved(&result)
+	}
+}
+
+func (mm *MarketMonitor) onMarketResolved(info *gjson.Result) {
+	resolvedInfo := &ResolvedInfo{
+		EventType:      info.Get("event_type").String(),
+		Id:             info.Get("id").String(),
+		Market:         info.Get("market").String(),
+		AssetsIds:      utils.GetStringArray(info, "assets_ids"),
+		WinningAssetId: info.Get("winning_asset_id").String(),
+		WinningOutcome: info.Get("winning_outcome").String(),
+		Timestamp:      info.Get("timestamp").Int(),
+		Tags:           utils.GetStringArray(info, "tags"),
 	}
 
+	select {
+	case mm.resolvedCh <- resolvedInfo:
+	default:
+		log.Println("[MarketMonitor] resolvedCh full")
+	}
+}
+
+func (pm *MarketMonitor) onOrderBook(info *gjson.Result) {
 	book := &OrderBook{}
-	book.Market = result.Get("market").String()
-	book.AssetId = result.Get("asset_id").String()
-	book.Timestamp = result.Get("timestamp").Int()
+	book.Market = info.Get("market").String()
+	book.AssetId = info.Get("asset_id").String()
+	book.Timestamp = info.Get("timestamp").Int()
 	book.Latency = time.Now().UnixMilli() - book.Timestamp
 
 	// bids
-	bids := result.Get("bids").Array()
+	bids := info.Get("bids").Array()
 
 	if len(bids) > 0 {
 		book.Bids = make([]orders.Book, 0, len(bids))
@@ -161,7 +193,7 @@ func (pm *MarketMonitor) handleMessage(msg []byte) {
 	}
 
 	// asks
-	asks := result.Get("asks").Array()
+	asks := info.Get("asks").Array()
 
 	if len(asks) > 0 {
 		book.Asks = make([]orders.Book, 0, len(asks))

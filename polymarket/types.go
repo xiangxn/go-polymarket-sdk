@@ -102,3 +102,14 @@ const (
 	Weekly   CryptoPriceUint = "weekly"
 	Monthly  CryptoPriceUint = "monthly"
 )
+
+type ResolvedInfo struct {
+	EventType      string   `json:"event_type"`
+	Id             string   `json:"id"`
+	Market         string   `json:"market"`
+	AssetsIds      []string `json:"assets_ids"`
+	WinningAssetId string   `json:"winning_asset_id"`
+	WinningOutcome string   `json:"winning_outcome"`
+	Timestamp      int64    `json:"timestamp"`
+	Tags           []string `json:"tags"`
+}
