@@ -210,18 +210,17 @@ func (ep *CryptoPriceMonitor) GetExternalPrice(symbol string, resolutionSource s
 	return 0
 }
 
-func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result) float64 {
+// return openPrice,closePrice
+func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result) (float64, float64) {
 	tags := market.Get("tags").Array()
 	endDate := market.Get("endDate").String()
 	symbol, err := GetSymbol(tags)
 	if err != nil {
-		log.Print(0)
-		return 0
+		return 0, 0
 	}
 	u, err := GetTimeUnit(tags)
 	if err != nil {
-		log.Print(1)
-		return 0
+		return 0, 0
 	}
 	unit, err := GetSearchTimeUnit(u)
 	startTime := GetStartTime(u, endDate)

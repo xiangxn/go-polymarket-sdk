@@ -804,7 +804,7 @@ func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
 	c.negRisk[tokenID] = negRisk
 }
 
-func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint) float64 {
+func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint) (float64, float64) {
 	url := "https://polymarket.com/api/crypto/crypto-price"
 	params := map[string]string{
 		"symbol":         string(symbol),
@@ -814,7 +814,7 @@ func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime ti
 	}
 	result, err := c.Get(url, params, nil)
 	if err != nil {
-		return 0
+		return 0, 0
 	}
-	return result.Get("openPrice").Float()
+	return result.Get("openPrice").Float(), result.Get("closePrice").Float()
 }
