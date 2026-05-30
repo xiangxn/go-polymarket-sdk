@@ -814,6 +814,7 @@ func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime ti
 	}
 	result, err := c.Get(url, params, nil)
 	if err != nil {
+		log.Printf("FetchOpenPrice error: %v", err)
 		return 0, 0
 	}
 	return result.Get("openPrice").Float(), result.Get("closePrice").Float()

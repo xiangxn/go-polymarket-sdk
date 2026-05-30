@@ -216,10 +216,12 @@ func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result) (float64, flo
 	endDate := market.Get("endDate").String()
 	symbol, err := GetSymbol(tags)
 	if err != nil {
+		log.Printf("GetSymbol error: %v", err)
 		return 0, 0
 	}
 	u, err := GetTimeUnit(tags)
 	if err != nil {
+		log.Printf("GetTimeUnit error: %v", err)
 		return 0, 0
 	}
 	unit, err := GetSearchTimeUnit(u)
