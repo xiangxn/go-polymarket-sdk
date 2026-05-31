@@ -153,6 +153,8 @@ func (pm *MarketMonitor) handleMessage(msg []byte) {
 		pm.onOrderBook(&result)
 	case "market_resolved":
 		pm.onMarketResolved(&result)
+	default:
+		// log.Printf("event_type: %s, %s", event_type, result.Get("winning_outcome").String())
 	}
 }
 
@@ -340,23 +342,20 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 
 	pm.muSubsTokens.Unlock()
 
-	if len(subs) == 0 ||
-		pm.ws == nil ||
-		!pm.ws.IsAlive() {
+	if pm.ws == nil || !pm.ws.IsAlive() {
 		return
 	}
 
 	// 先WS订阅
 	subscribeMessage := MarketMessage{
-		Type:                 "MARKET",
+		Type:                 "market",
 		AssetsIDs:            subs,
 		CustomFeatureEnabled: pm.customFeatureEnabled,
 	}
 
 	data, _ := json.Marshal(subscribeMessage)
-
 	if err := pm.ws.Send(data); err != nil {
-		log.Printf("[MarketMonitor] subscribe failed: %v", err)
+		log.Printf("[MarketMonitor] subscribe failed: %v\n%s", err, data)
 		return
 	}
 
