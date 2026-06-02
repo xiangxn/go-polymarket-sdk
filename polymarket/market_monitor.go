@@ -417,7 +417,9 @@ func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
 
 func (pm *MarketMonitor) OnOpen() {
 	log.Println("[MarketMonitor] WebSocket connected")
-	pm.subscribeToMarket()
+	if len(pm.subsTokens) > 0 {
+		pm.subscribeToMarket()
+	}
 }
 
 func (pm *MarketMonitor) OnReconnect() {
