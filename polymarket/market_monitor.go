@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -71,7 +72,7 @@ func NewMarketMonitor(
 	}
 }
 
-func (mm *MarketMonitor) Subscribe() <-chan *OrderBook {
+func (mm *MarketMonitor) SubscribeOrderBook() <-chan *OrderBook {
 	return mm.orderBookCh
 }
 
@@ -257,24 +258,46 @@ func (pm *MarketMonitor) Disconnect() {
 }
 
 // Reset
-func (pm *MarketMonitor) Reset() {
+func (pm *MarketMonitor) Reset(isReconnect bool) {
 
 	for _, t := range pm.subsTokens {
 		pm.orderBooks.Delete(t)
 	}
 
 	pm.muSubsTokens.Lock()
+	tokens := slices.Clone(pm.subsTokens)
 	pm.subsTokens = nil
 	pm.muSubsTokens.Unlock()
 
-	if pm.ws != nil {
+	pm.UnsubscribeTokens(tokens...)
+
+	if pm.ws != nil && isReconnect {
 		_ = pm.ws.Reset()
+	}
+}
+
+func (pm *MarketMonitor) Subscribe() {
+	if pm.ws == nil || !pm.ws.IsAlive() {
+		return
+	}
+
+	// 先WS订阅
+	subscribeMessage := MarketMessage{
+		Type:                 "market",
+		AssetsIDs:            []string{},
+		CustomFeatureEnabled: pm.customFeatureEnabled,
+	}
+
+	data, _ := json.Marshal(subscribeMessage)
+	if err := pm.ws.Send(data); err != nil {
+		log.Printf("[MarketMonitor] subscribe failed: %v\n%s", err, data)
+		return
 	}
 }
 
 // SubscribeTokens
 func (pm *MarketMonitor) SubscribeTokens(tokens ...string) {
-	pm.subscribeToMarket(tokens...)
+	pm.subscribeMarket(tokens...)
 }
 
 func (pm *MarketMonitor) UnsubscribeTokens(tokens ...string) {
@@ -309,9 +332,27 @@ func (pm *MarketMonitor) UnsubscribeTokens(tokens ...string) {
 	}
 
 	pm.subsTokens = dst
+
+	if len(dst) <= 0 || pm.ws == nil || !pm.ws.IsAlive() {
+		return
+	}
+
+	subscribeMessage := DynamicSubMarketMessage{
+		Operation:            DynamicUnSub,
+		AssetsIds:            tokens,
+		CustomFeatureEnabled: &pm.customFeatureEnabled,
+	}
+
+	data, _ := json.Marshal(subscribeMessage)
+	if err := pm.ws.Send(data); err != nil {
+		log.Printf("[MarketMonitor] subscribe failed: %v\n%s", err, data)
+		return
+	}
+
+	log.Printf("[MarketMonitor] unsubscribed market tokens: %v", tokens)
 }
 
-func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
+func (pm *MarketMonitor) subscribeMarket(tokens ...string) {
 
 	pm.muSubsTokens.Lock()
 
@@ -342,15 +383,15 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 
 	pm.muSubsTokens.Unlock()
 
-	if pm.ws == nil || !pm.ws.IsAlive() {
+	if len(subs) <= 0 || pm.ws == nil || !pm.ws.IsAlive() {
 		return
 	}
 
-	// 先WS订阅
-	subscribeMessage := MarketMessage{
-		Type:                 "market",
-		AssetsIDs:            subs,
-		CustomFeatureEnabled: pm.customFeatureEnabled,
+	// 动态订阅tokens
+	subscribeMessage := DynamicSubMarketMessage{
+		Operation:            DynamicSub,
+		AssetsIds:            subs,
+		CustomFeatureEnabled: &pm.customFeatureEnabled,
 	}
 
 	data, _ := json.Marshal(subscribeMessage)
@@ -359,7 +400,7 @@ func (pm *MarketMonitor) subscribeToMarket(tokens ...string) {
 		return
 	}
 
-	log.Printf("[MarketMonitor] subscribed markets: %v", subs)
+	log.Printf("[MarketMonitor] subscribed market tokens: %v", subs)
 
 	// 异步REST补快照，暂时无意义，所以注释掉
 	//go pm.fetchOrderbooks(subs...)
@@ -417,14 +458,15 @@ func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
 
 func (pm *MarketMonitor) OnOpen() {
 	log.Println("[MarketMonitor] WebSocket connected")
-	if len(pm.subsTokens) > 0 {
-		pm.subscribeToMarket()
-	}
+
+	// pm.Subscribe()
+
+	pm.subscribeMarket()
 }
 
 func (pm *MarketMonitor) OnReconnect() {
 	log.Println("[MarketMonitor] WebSocket reconnect")
-	pm.subscribeToMarket()
+	pm.subscribeMarket()
 }
 
 func (pm *MarketMonitor) OnError(err error) {

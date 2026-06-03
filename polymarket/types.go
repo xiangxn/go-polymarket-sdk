@@ -7,6 +7,13 @@ import (
 	"github.com/xiangxn/go-polymarket-sdk/orders"
 )
 
+type OperationType = string
+
+const (
+	DynamicSub   OperationType = "subscribe"
+	DynamicUnSub OperationType = "unsubscribe"
+)
+
 type ContractConfig struct {
 	Exchange          common.Address
 	NegRiskAdapter    common.Address
@@ -74,6 +81,12 @@ type MarketMessage struct {
 	AssetsIDs            []string `json:"assets_ids"`
 	CustomFeatureEnabled bool     `json:"custom_feature_enabled"`
 	InitialDump          bool     `json:"initial_dump"`
+}
+
+type DynamicSubMarketMessage struct {
+	AssetsIds            []string      `json:"assets_ids"`
+	Operation            OperationType `json:"operation"`
+	CustomFeatureEnabled *bool         `json:"custom_feature_enabled,omitempty"`
 }
 
 // WSMessage WebSocket消息
