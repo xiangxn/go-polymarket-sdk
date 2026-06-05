@@ -6,6 +6,7 @@ import (
 
 	"github.com/xiangxn/go-polymarket-sdk/headers"
 	"github.com/xiangxn/go-polymarket-sdk/model"
+	"github.com/xiangxn/go-polymarket-sdk/orders"
 )
 
 type PolymarketConfig struct {
@@ -17,6 +18,8 @@ type PolymarketConfig struct {
 	GammaBaseURL   string `mapstructure:"gamma_base_url"`
 	RelayerBaseURL string `mapstructure:"relayer_base_url"`
 	DataAPIBaseURL string `mapstructure:"data_api_base_url"`
+
+	SignatureType orders.SignatureType `mapstructure:"signature_type"`
 
 	OwnerKey     string              `mapstructure:"owner_key"`
 	BuilderCode  *string             `mapstructure:"builder_code"`

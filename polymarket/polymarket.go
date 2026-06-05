@@ -356,7 +356,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	} else {
 		maker = c.signer.Address.String()
 	}
-	signatureType := orders.EOA
+	signatureType := c.cfg.Polymarket.SignatureType
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
@@ -424,7 +424,7 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	} else {
 		maker = c.signer.Address.String()
 	}
-	signatureType := orders.EOA
+	signatureType := c.cfg.Polymarket.SignatureType
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}

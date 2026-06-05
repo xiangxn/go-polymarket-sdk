@@ -2,6 +2,8 @@ package polymarket
 
 import (
 	"time"
+
+	"github.com/xiangxn/go-polymarket-sdk/orders"
 )
 
 func (c *PolymarketConfig) HasCLOBAuth() bool {
@@ -29,6 +31,8 @@ func DefaultConfig() *Config {
 			GammaBaseURL:   "https://gamma-api.polymarket.com",
 			RelayerBaseURL: "https://relayer-v2.polymarket.com",
 			DataAPIBaseURL: "https://data-api.polymarket.com",
+
+			SignatureType: orders.POLY_GNOSIS_SAFE,
 
 			BuilderCode:  nil,
 			OwnerKey:     "1111111111111111111111111111111111111111111111111111111111111111",
