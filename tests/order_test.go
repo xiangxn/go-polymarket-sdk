@@ -27,11 +27,11 @@ func TestF2S(t *testing.T) {
 
 func TestCreateOrder(t *testing.T) {
 	config := polymarket.DefaultConfig()
-	config.Polymarket.OwnerKey = "95f57df83272121b4c5c43b219e6a1ab38387362e9c10c81d477accf82d84c11"
+	config.Polymarket.OwnerKey = os.Getenv("SIGNERKEY")
 	client := polymarket.NewClient(config)
 
 	tickSize := orders.TickSize001
-	signatureType := orders.POLY_PROXY
+	signatureType := orders.POLY_1271
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: "24762431047507049460785923962525415896557183202961867581065585559228045929655",
 		Price:   0.03,
@@ -133,10 +133,10 @@ func TestPlaceOrders(t *testing.T) {
 	client := polymarket.NewClient(config)
 
 	tickSize := orders.TickSize001
-	signatureType := orders.POLY_GNOSIS_SAFE
+	signatureType := orders.POLY_1271
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: tokenID,
-		Price:   0.2,
+		Price:   0.01,
 		Size:    5.0,
 		Side:    orders.BUY,
 	}, orders.CreateOrderOptions{
@@ -146,11 +146,10 @@ func TestPlaceOrders(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("order: %+v", order)
 
 	order2, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: tokenID,
-		Price:   0.2,
+		Price:   0.01,
 		Size:    5.0,
 		Side:    orders.BUY,
 	}, orders.CreateOrderOptions{

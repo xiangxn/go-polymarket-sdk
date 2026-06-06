@@ -104,6 +104,8 @@ type Order struct {
 
 	// Builder of the order
 	Builder common.Hash
+
+	Expiration *string
 }
 
 type SignedOrder struct {

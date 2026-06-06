@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/big"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
 )
 
 func IsTickSizeSmaller(a TickSize, b TickSize) bool {
@@ -39,4 +41,12 @@ func GenerateRandomSalt() int64 {
 	maxInt := math.Pow(2, 32)
 	nBig, _ := rand.Int(rand.Reader, big.NewInt(int64(maxInt)))
 	return nBig.Int64()
+}
+
+func MustType(t string) abi.Type {
+	ty, err := abi.NewType(t, "", nil)
+	if err != nil {
+		panic(err)
+	}
+	return ty
 }

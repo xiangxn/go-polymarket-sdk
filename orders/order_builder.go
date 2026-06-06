@@ -35,12 +35,10 @@ type OrderBuilder interface {
 
 	// signs an order
 	//
-	// @param private key
-	//
-	// @param order hash
+	// @param Order
 	//
 	// @returns a OrderSignature that is []byte
-	BuildOrderSignature(privateKey *ecdsa.PrivateKey, orderHash OrderHash) (OrderSignature, error)
+	BuildOrderSignature(privateKey *ecdsa.PrivateKey, order *Order, contract VerifyingContract) (OrderSignature, error)
 }
 
 func GetVerifyingContractAddress(chainId *big.Int, contract VerifyingContract) (common.Address, error) {

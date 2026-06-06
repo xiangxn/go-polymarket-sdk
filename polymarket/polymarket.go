@@ -356,14 +356,24 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	} else {
 		maker = c.signer.Address.String()
 	}
+
 	signatureType := c.cfg.Polymarket.SignatureType
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
+
+	var signerForOrder string
+	if signatureType == orders.POLY_1271 {
+		signerForOrder = maker
+	} else {
+		signerForOrder = c.signer.Address.String()
+	}
+
+	// log.Printf("signatureType: %d", signatureType)
 	if userOrder.BuilderCode == nil {
 		userOrder.BuilderCode = c.cfg.Polymarket.BuilderCode
 	}
-	orderData, err := orders.BuildOrderCreationArgs(c.signer.Address.String(), maker, signatureType, userOrder, orders.GetRoundConfig(tickSize))
+	orderData, err := orders.BuildOrderCreationArgs(signerForOrder, maker, signatureType, userOrder, orders.GetRoundConfig(tickSize))
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +438,15 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	if options.SignatureType != nil {
 		signatureType = *options.SignatureType
 	}
-	orderData, err := orders.BuildMarketOrderCreationArgs(c.signer.Address.String(), maker, signatureType, userMarketOrder, orders.GetRoundConfig(tickSize))
+
+	var signerForOrder string
+	if signatureType == orders.POLY_1271 {
+		signerForOrder = maker
+	} else {
+		signerForOrder = c.signer.Address.String()
+	}
+
+	orderData, err := orders.BuildMarketOrderCreationArgs(signerForOrder, maker, signatureType, userMarketOrder, orders.GetRoundConfig(tickSize))
 	if err != nil {
 		return nil, err
 	}
