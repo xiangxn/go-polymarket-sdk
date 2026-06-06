@@ -4,7 +4,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const CollateralTokenDecimals = 6
+const CollateralTokenDecimals int32 = 6
 
 const (
 	SAFE_MULTISEND       = "0xA238CBeb142c10Ef7Ad8442C6D1f9E89e07e7761"

@@ -345,7 +345,7 @@ func (c *RelayClient) MergeTokens(conditionId string, amount string, negRisk boo
 	return resp, nil
 }
 
-func (c *RelayClient) Transfer(erc20Address string, to string, amount string, decimals int) (*RelayerTransactionResponse, error) {
+func (c *RelayClient) Transfer(erc20Address string, to string, amount string, decimals int32) (*RelayerTransactionResponse, error) {
 	erc20Abi, err := abi.JSON(strings.NewReader(ERC20TransferJSON))
 	if err != nil {
 		return nil, err
@@ -372,7 +372,7 @@ func (c *RelayClient) Transfer(erc20Address string, to string, amount string, de
 	return resp, nil
 }
 
-func (c *RelayClient) Approve(erc20Address string, spender string, value string, decimals int) (*RelayerTransactionResponse, error) {
+func (c *RelayClient) Approve(erc20Address string, spender string, value string, decimals int32) (*RelayerTransactionResponse, error) {
 	erc20Abi, err := abi.JSON(strings.NewReader(ERC20TransferJSON))
 	if err != nil {
 		return nil, err

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"math/big"
 	"strconv"
@@ -48,6 +47,23 @@ func AlreadyWithinScale(d decimal.Decimal, decimals int) bool {
 		return true // 整数或更粗粒度
 	}
 	return int(-exp) <= decimals
+}
+
+func DecimalPlaces[T Roundable](num T) int {
+	var d decimal.Decimal
+	switch v := any(num).(type) {
+	case float64:
+		d = decimal.NewFromFloat(v)
+	case decimal.Decimal:
+		d = v
+	default:
+		panic("unsupported type")
+	}
+	exp := d.Exponent()
+	if exp >= 0 {
+		return 0
+	}
+	return int(-exp)
 }
 
 func RoundNormal[T Roundable](num T, decimals int) decimal.Decimal {
@@ -107,30 +123,13 @@ func RoundUp[T Roundable](num T, decimals int) decimal.Decimal {
 	return d.Div(scale).Ceil().Mul(scale)
 }
 
-func ParseUnits(amount string, decimals int) (*big.Int, error) {
-	parts := strings.SplitN(amount, ".", 2)
-	intPart := parts[0]
-
-	fracPart := ""
-	if len(parts) == 2 {
-		fracPart = parts[1]
-		if len(fracPart) > decimals {
-			fracPart = fracPart[:decimals] // 截断多余小数位
-		}
+func ParseUnits(amount string, decimals int32) (*big.Int, error) {
+	d, err := decimal.NewFromString(amount)
+	if err != nil {
+		return nil, err
 	}
 
-	// 补齐小数位
-	for len(fracPart) < decimals {
-		fracPart += "0"
-	}
-
-	result := new(big.Int)
-	_, ok := result.SetString(intPart+fracPart, 10)
-	if !ok {
-		return nil, fmt.Errorf("invalid amount: %s", amount)
-	}
-
-	return result, nil
+	return d.Shift(decimals).BigInt(), nil
 }
 
 func FloatToString(num float64, maxDecimals int) string {

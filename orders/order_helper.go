@@ -20,7 +20,13 @@ func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *Rou
 
 		// log.Printf("rawTakerAmt: %f, size: %f, Amount: %d", rawTakerAmt, size, roundConfig.Amount)
 		rawMakerAmt := rawTakerAmt.Mul(rawPrice)
-		rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
+			rawMakerAmt = utils.RoundUp(rawMakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawMakerAmt) > roundConfig.Amount {
+				rawMakerAmt = utils.RoundDown(rawMakerAmt, roundConfig.Amount)
+			}
+		}
+
 		// log.Printf("rawMakerAmt: %f", rawMakerAmt)
 		return BUY, rawMakerAmt.Truncate(int32(roundConfig.Amount)).String(), rawTakerAmt.Truncate(int32(roundConfig.Size)).String()
 
@@ -29,7 +35,13 @@ func GetOrderRawAmounts(side Side, size float64, price float64, roundConfig *Rou
 
 		rawTakerAmt := rawMakerAmt.Mul(rawPrice)
 		// log.Printf("rawTakerAmt0: %.18f, size: %.18f, Amount: %d, rawMakerAmt: %.18f, rawPrice: %.18f", rawTakerAmt.InexactFloat64(), size, roundConfig.Amount, rawMakerAmt.InexactFloat64(), rawPrice.InexactFloat64())
-		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+			}
+		}
+
 		// log.Printf("rawTakerAmt0: %.18f, size: %.18f, Amount: %d, rawMakerAmt: %.18f, rawPrice: %.18f", rawTakerAmt.InexactFloat64(), size, roundConfig.Amount, rawMakerAmt.InexactFloat64(), rawPrice.InexactFloat64())
 
 		return SELL, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
@@ -43,12 +55,24 @@ func GetMarketOrderRawAmounts(side Side, amount float64, price float64, roundCon
 	if side == BUY {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt.Div(rawPrice)
-		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount+4)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+			}
+		}
+
 		return BUY, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
 	} else {
 		rawMakerAmt := utils.RoundDown(amount, roundConfig.Size)
 		rawTakerAmt := rawMakerAmt.Mul(rawPrice)
-		rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+		if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+			rawTakerAmt = utils.RoundUp(rawTakerAmt, roundConfig.Amount)
+			if utils.DecimalPlaces(rawTakerAmt) > roundConfig.Amount {
+				rawTakerAmt = utils.RoundDown(rawTakerAmt, roundConfig.Amount)
+			}
+		}
+
 		return SELL, rawMakerAmt.Truncate(int32(roundConfig.Size)).String(), rawTakerAmt.Truncate(int32(roundConfig.Amount)).String()
 	}
 }
@@ -64,6 +88,8 @@ func BuildOrderCreationArgs(signer string, maker string, signatureType Signature
 	if err != nil {
 		return nil, err
 	}
+
+	// log.Printf("makerAmount: %s, takerAmount: %s", makerAmount.String(), takerAmount.String())
 
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 

@@ -34,8 +34,8 @@ func TestCreateOrder(t *testing.T) {
 	signatureType := orders.POLY_1271
 	order, err := client.CreateOrder(&orders.UserOrder{
 		TokenID: "24762431047507049460785923962525415896557183202961867581065585559228045929655",
-		Price:   0.03,
-		Size:    30.0,
+		Price:   0.5,
+		Size:    16.875,
 		Side:    orders.SELL,
 	}, orders.CreateOrderOptions{
 		TickSize:      &tickSize,
