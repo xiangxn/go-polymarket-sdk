@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"runtime"
 	"slices"
 	"sync"
 	"sync/atomic"
@@ -53,6 +54,11 @@ type MarketMonitor struct {
 
 	// 是否存储Orderbook
 	isStore bool
+
+	// 原始消息处理：解耦WS readLoop与重度JSON解析
+	rawMsgCh   chan []byte
+	procCancel context.CancelFunc
+	procWg     sync.WaitGroup
 }
 
 func NewMarketMonitor(
@@ -65,6 +71,7 @@ func NewMarketMonitor(
 	return &MarketMonitor{
 		orderBookCh:          make(chan *OrderBook, 4096),
 		resolvedCh:           make(chan *ResolvedInfo, 4096),
+		rawMsgCh:             make(chan []byte, 32768),
 		clobMarketWSSURL:     fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:             client,
 		isStore:              isStore,
@@ -116,12 +123,34 @@ func (pm *MarketMonitor) Run(ctx context.Context) error {
 		return nil
 	}
 
+	// 停止旧的 processor pool（如果存在）
+	if pm.procCancel != nil {
+		pm.procCancel()
+		pm.procWg.Wait()
+	}
+
+	// 启动消息处理池，解耦 WS readLoop
+	procCtx, procCancel := context.WithCancel(context.Background())
+	pm.procCancel = procCancel
+
+	numWorkers := runtime.NumCPU()
+	for i := 0; i < numWorkers; i++ {
+		pm.procWg.Add(1)
+		go pm.processMessages(procCtx)
+	}
+
+	defer func() {
+		procCancel()
+		pm.procWg.Wait()
+	}()
+
 	pm.ws = utils.NewWSClient(
 		utils.WSConfig{
-			URL:          pm.clobMarketWSSURL,
-			PingInterval: 10 * time.Second,
-			Reconnect:    true,
-			MaxReconnect: 20,
+			URL:           pm.clobMarketWSSURL,
+			PingInterval:  10 * time.Second,
+			Reconnect:     true,
+			MaxReconnect:  20,
+			MsgBufferSize: 32768,
 		},
 		pm,
 	)
@@ -245,6 +274,12 @@ func (pm *MarketMonitor) updateOrderBook(book *OrderBook) {
 
 // Disconnect
 func (pm *MarketMonitor) Disconnect() {
+
+	// 先停止消息处理池，防止 goroutine 泄漏
+	if pm.procCancel != nil {
+		pm.procCancel()
+		pm.procWg.Wait()
+	}
 
 	pm.muSubsTokens.Lock()
 	defer pm.muSubsTokens.Unlock()
@@ -454,6 +489,31 @@ func (pm *MarketMonitor) GetTokenPrice(tokenID string) (*PriceData, error) {
 	}, nil
 }
 
+/*** 消息处理池：解耦WS readLoop ***/
+
+func (pm *MarketMonitor) processMessages(ctx context.Context) {
+	defer pm.procWg.Done()
+	for {
+		select {
+		case <-ctx.Done():
+			// 退出前清空残留消息，限制最大 drain 数量防止 shutdown 卡死
+			const maxDrain = 1000
+			for range maxDrain {
+				select {
+				case msg := <-pm.rawMsgCh:
+					pm.handleMessage(msg)
+				default:
+					return
+				}
+			}
+			log.Printf("[MarketMonitor] processMessages drain limit reached (%d), some messages may be lost", maxDrain)
+			return
+		case msg := <-pm.rawMsgCh:
+			pm.handleMessage(msg)
+		}
+	}
+}
+
 /*** WSClient handlers ***/
 
 func (pm *MarketMonitor) OnOpen() {
@@ -487,5 +547,26 @@ func (pm *MarketMonitor) OnMessage(msg []byte) {
 		return
 	}
 
-	pm.handleMessage(msg)
+	// 快速拷贝后立即返回，将重度JSON解析交给processMessages pool
+	// 避免阻塞 WS readLoop，从根本上解决 slow consumer 问题
+	buf := make([]byte, len(msg))
+	copy(buf, msg)
+
+	// 非阻塞投递，满时丢弃最旧消息保留最新
+	select {
+	case pm.rawMsgCh <- buf:
+		return
+	default:
+	}
+
+	// drop oldest
+	select {
+	case <-pm.rawMsgCh:
+	default:
+	}
+
+	select {
+	case pm.rawMsgCh <- buf:
+	default:
+	}
 }
