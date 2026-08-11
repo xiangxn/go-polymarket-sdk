@@ -441,6 +441,11 @@ func (pm *MarketMonitor) subscribeMarket(tokens ...string) {
 	//go pm.fetchOrderbooks(subs...)
 }
 
+// RemoveTokenOrderBook 按 tokenId 清理 orderBooks 中的条目
+func (pm *MarketMonitor) RemoveTokenOrderBook(tokenID string) {
+	pm.orderBooks.Delete(tokenID)
+}
+
 // immutable pointer
 func (pm *MarketMonitor) GetTokenOrderBook(tokenID string) (*OrderBook, error) {
 
