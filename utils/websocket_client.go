@@ -45,6 +45,10 @@ type WSConfig struct {
 	// worker数量
 	WorkerNum int
 
+	// gorilla/websocket 底层TCP读写缓冲区大小（默认4096，高频行情建议 >= 32768）
+	ReadBufferSize  int
+	WriteBufferSize int
+
 	// websocket ping frame间隔
 	PingInterval time.Duration
 
@@ -236,10 +240,21 @@ func (c *wsClient) connect() error {
 
 	dialer := c.dialer
 	if dialer == nil {
-		dialer = websocket.DefaultDialer
+		dialer = &websocket.Dialer{
+			Proxy:            websocket.DefaultDialer.Proxy,
+			HandshakeTimeout: c.cfg.HandshakeTimeout,
+		}
+	} else {
+		dialer.HandshakeTimeout = c.cfg.HandshakeTimeout
 	}
 
-	dialer.HandshakeTimeout = c.cfg.HandshakeTimeout
+	// 设置底层TCP读写缓冲区，增大可缓解 slow consumer 问题
+	if c.cfg.ReadBufferSize > 0 {
+		dialer.ReadBufferSize = c.cfg.ReadBufferSize
+	}
+	if c.cfg.WriteBufferSize > 0 {
+		dialer.WriteBufferSize = c.cfg.WriteBufferSize
+	}
 
 	conn, _, err := dialer.Dial(c.cfg.URL, nil)
 	if err != nil {
