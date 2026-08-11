@@ -314,7 +314,7 @@ func (c *PolymarketClient) ResolveFeeRateBps(tokenID string, userFeeRateBps *flo
 	if err != nil {
 		return 0, err
 	}
-	if marketFeeRateBps > 0 && userFeeRateBps != nil && userFeeRateBps != &marketFeeRateBps {
+	if marketFeeRateBps > 0 && userFeeRateBps != nil && *userFeeRateBps != marketFeeRateBps {
 		return 0, fmt.Errorf("userFeeRateBps %f is not equal to marketFeeRateBps %f", *userFeeRateBps, marketFeeRateBps)
 	}
 	return marketFeeRateBps, nil
@@ -386,7 +386,7 @@ func (c *PolymarketClient) CreateOrder(userOrder *orders.UserOrder, options orde
 	return order, nil
 }
 
-func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions) (*orders.SignedOrder, error) {
+func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketOrder, options orders.CreateOrderOptions, book *OrderBookSummary) (*orders.SignedOrder, error) {
 	if c.cfg.Polymarket.ChainID == 0 {
 		return nil, fmt.Errorf("chainID cannot be empty")
 	}
@@ -396,7 +396,7 @@ func (c *PolymarketClient) CreateMarketOrder(userMarketOrder *orders.UserMarketO
 	}
 
 	if userMarketOrder.Price == nil { // 尽量在外面计算价格
-		price, cErr := c.CalculateMarketPrice(userMarketOrder.TokenID, userMarketOrder.Side, userMarketOrder.Amount, userMarketOrder.OrderType)
+		price, cErr := c.CalculateMarketPrice(userMarketOrder.TokenID, userMarketOrder.Side, userMarketOrder.Amount, userMarketOrder.OrderType, book)
 		if cErr != nil {
 			return nil, cErr
 		}
@@ -648,7 +648,9 @@ func (c *PolymarketClient) GetApiKeys() ([]string, error) {
 	}
 	var apiKeys []string
 	for _, item := range result.Get("apiKeys").Array() {
-		apiKeys = append(apiKeys, item.Value().(string))
+		if s, ok := item.Value().(string); ok {
+				apiKeys = append(apiKeys, s)
+			}
 	}
 	return apiKeys, nil
 }
@@ -735,10 +737,13 @@ func (c *PolymarketClient) GetServerTime() (int64, error) {
 	return result.Int(), nil
 }
 
-func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side orders.Side, amount float64, orderType orders.MarketOrderType) (float64, error) {
-	book, err := c.GetOrderBook(tokenID)
-	if err != nil {
-		return 0, fmt.Errorf("no orderbook")
+func (c *PolymarketClient) CalculateMarketPrice(tokenID string, side orders.Side, amount float64, orderType orders.MarketOrderType, book *OrderBookSummary) (float64, error) {
+	if book == nil {
+		var err error
+		book, err = c.GetOrderBook(tokenID)
+		if err != nil {
+			return 0, fmt.Errorf("no orderbook: %w", err)
+		}
 	}
 	if side == orders.BUY {
 		if book.Asks == nil {

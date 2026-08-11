@@ -66,7 +66,7 @@ func TestCreateMarketOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      &tickSize,
 		SignatureType: &signatureType,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +241,7 @@ func TestPlaceMarketOrder(t *testing.T) {
 	}, orders.CreateOrderOptions{
 		TickSize:      &tickSize,
 		SignatureType: &signatureType,
-	})
+	}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
