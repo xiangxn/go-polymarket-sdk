@@ -16,32 +16,46 @@ import (
 const SYMBOL_SUFFIX_BINANCE = "usdt"
 const SYMBOL_SUFFIX_CHAINLINK = "/usd"
 
+const TOPIC_CHAINLINK_TWAP_THIRTY = "crypto_prices_twap_thirty"
+const TOPIC_CHAINLINK_TWAP_SIXTY = "crypto_prices_twap_sixty"
+
+// Chainlink TWAP 窗口秒数
+const (
+	ChainlinkTwapWindowThirty = 30
+	ChainlinkTwapWindowSixty  = 60
+)
+
 type MonitorType string
 
 const (
-	MonitorAll       MonitorType = "ALL"
-	MonitorBinance   MonitorType = "BINANCE"
-	MonitorChainlink MonitorType = "CHAINLINK"
+	MonitorAll           MonitorType = "ALL"
+	MonitorBinance       MonitorType = "BINANCE"
+	MonitorChainlink     MonitorType = "CHAINLINK"
+	MonitorChainlinkTwap MonitorType = "CHAINLINK_TWAP"
 )
 
 type ExternalPrice struct {
-	Symbol    string
-	Price     float64
-	Source    string
-	Timestamp int64
+	Symbol        string
+	Price         float64
+	Source        string
+	Timestamp     int64
+	WindowSeconds int64 // TWAP 窗口秒数(30/60)，现货为 0
 }
 
 type CryptoPriceMonitor struct {
 	ws       utils.WSClient
 	pmClient *PolymarketClient
 
-	binancePrices   map[string]float64
-	chainlinkPrices map[string]float64
+	binancePrices         map[string]float64
+	chainlinkPrices       map[string]float64
+	chainlinkTwap30Prices map[string]float64
+	chainlinkTwap60Prices map[string]float64
 
 	subscriptions []map[string]any
 
-	binanceMU   sync.RWMutex
-	chainlinkMU sync.RWMutex
+	binanceMU       sync.RWMutex
+	chainlinkMU     sync.RWMutex
+	chainlinkTwapMU sync.RWMutex
 
 	priceCh chan ExternalPrice
 }
@@ -63,11 +77,13 @@ func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, 
 	}
 
 	cpm := CryptoPriceMonitor{
-		pmClient:        pmClient,
-		priceCh:         make(chan ExternalPrice, 4096),
-		binancePrices:   make(map[string]float64),
-		chainlinkPrices: make(map[string]float64),
-		subscriptions:   []map[string]any{},
+		pmClient:              pmClient,
+		priceCh:               make(chan ExternalPrice, 4096),
+		binancePrices:         make(map[string]float64),
+		chainlinkPrices:       make(map[string]float64),
+		chainlinkTwap30Prices: make(map[string]float64),
+		chainlinkTwap60Prices: make(map[string]float64),
+		subscriptions:         []map[string]any{},
 	}
 	if monitorType == MonitorAll || monitorType == MonitorBinance {
 		cpm.subscriptions = append(cpm.subscriptions, map[string]any{
@@ -82,6 +98,27 @@ func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, 
 			"type":    "update",
 			"filters": sc,
 		})
+	}
+	if monitorType == MonitorAll || monitorType == MonitorChainlinkTwap {
+		for _, topic := range []string{TOPIC_CHAINLINK_TWAP_THIRTY, TOPIC_CHAINLINK_TWAP_SIXTY} {
+			if len(symbols) == 0 {
+				// 未指定 symbol 时不加 filter，订阅全部
+				cpm.subscriptions = append(cpm.subscriptions, map[string]any{
+					"topic":   topic,
+					"type":    "update",
+					"filters": "",
+				})
+				continue
+			}
+			// 每个 topic + symbol 一条订阅，filters 为单对象格式
+			for _, symbol := range symbols {
+				cpm.subscriptions = append(cpm.subscriptions, map[string]any{
+					"topic":   topic,
+					"type":    "update",
+					"filters": fmt.Sprintf("{\"symbol\":\"%s%s\"}", strings.ToLower(symbol), SYMBOL_SUFFIX_CHAINLINK),
+				})
+			}
+		}
 	}
 
 	return &cpm
@@ -186,6 +223,29 @@ func (ep *CryptoPriceMonitor) handleMessage(msg string) {
 				Timestamp: timestamp,
 			})
 		}
+	case TOPIC_CHAINLINK_TWAP_THIRTY, TOPIC_CHAINLINK_TWAP_SIXTY:
+		symbol := gjson.Get(msg, "payload.symbol").String()
+		price := gjson.Get(msg, "payload.value").Float()
+		timestamp := gjson.Get(msg, "payload.timestamp").Int()
+		window := gjson.Get(msg, "payload.window_s").Int()
+		// log.Printf("Chainlink TWAP Price: %f %s %ds", price, symbol, window)
+		symbol = strings.ToUpper(strings.Replace(symbol, "/usd", "", 1))
+		if symbol != "" && (window == ChainlinkTwapWindowThirty || window == ChainlinkTwapWindowSixty) {
+			ep.chainlinkTwapMU.Lock()
+			if window == ChainlinkTwapWindowThirty {
+				ep.chainlinkTwap30Prices[symbol] = price
+			} else {
+				ep.chainlinkTwap60Prices[symbol] = price
+			}
+			ep.chainlinkTwapMU.Unlock()
+			ep.emitPrice(ExternalPrice{
+				Symbol:        symbol,
+				Price:         price,
+				Source:        fmt.Sprintf("ChainlinkTWAP%d", window),
+				Timestamp:     timestamp,
+				WindowSeconds: window,
+			})
+		}
 	}
 }
 
@@ -202,6 +262,28 @@ func (ep *CryptoPriceMonitor) GetExternalPrice(symbol string, resolutionSource s
 		ep.binanceMU.RLock()
 		defer ep.binanceMU.RUnlock()
 		p, ok := ep.binancePrices[strings.ToUpper(symbol)]
+		if !ok {
+			return 0
+		}
+		return p
+	}
+	return 0
+}
+
+// GetTwapPrice 返回指定 symbol 最新 Chainlink TWAP 价格，windowSeconds 为 30 或 60
+func (ep *CryptoPriceMonitor) GetTwapPrice(symbol string, windowSeconds int64) float64 {
+	ep.chainlinkTwapMU.RLock()
+	defer ep.chainlinkTwapMU.RUnlock()
+	symbol = strings.ToUpper(symbol)
+	switch windowSeconds {
+	case ChainlinkTwapWindowThirty:
+		p, ok := ep.chainlinkTwap30Prices[symbol]
+		if !ok {
+			return 0
+		}
+		return p
+	case ChainlinkTwapWindowSixty:
+		p, ok := ep.chainlinkTwap60Prices[symbol]
 		if !ok {
 			return 0
 		}
