@@ -100,28 +100,66 @@ func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, 
 		})
 	}
 	if monitorType == MonitorAll || monitorType == MonitorChainlinkTwap {
-		for _, topic := range []string{TOPIC_CHAINLINK_TWAP_THIRTY, TOPIC_CHAINLINK_TWAP_SIXTY} {
+		// 每个 topic 只发一条订阅：filters 为包含全部 symbol 的数组格式（与 chainlink 现货一致）。
+		// 注意：同一 topic 的多条订阅只有一条生效，按 symbol 逐条订阅会导致只有第一个 symbol 能收到数据。
+		appendTwapSub := func(topic, filters string) {
+			cpm.subscriptions = append(cpm.subscriptions, map[string]any{
+				"topic":   topic,
+				"type":    "update",
+				"filters": filters,
+			})
+		}
+		if monitorType == MonitorChainlinkTwap {
+			// MonitorChainlinkTwap 模式下 symbol 支持窗口后缀：btc 等价 btc_30（30s），btc_60 为 60s。
+			// 指定了 symbol 时，某个窗口没有 symbol 就不订阅该窗口；未指定 symbol 则两个窗口都订阅全部。
+			filters30, filters60 := buildTwapFilters(symbols)
 			if len(symbols) == 0 {
-				// 未指定 symbol 时不加 filter，订阅全部
-				cpm.subscriptions = append(cpm.subscriptions, map[string]any{
-					"topic":   topic,
-					"type":    "update",
-					"filters": "",
-				})
-				continue
+				appendTwapSub(TOPIC_CHAINLINK_TWAP_THIRTY, "")
+				appendTwapSub(TOPIC_CHAINLINK_TWAP_SIXTY, "")
+			} else {
+				if filters30 != "" {
+					appendTwapSub(TOPIC_CHAINLINK_TWAP_THIRTY, filters30)
+				}
+				if filters60 != "" {
+					appendTwapSub(TOPIC_CHAINLINK_TWAP_SIXTY, filters60)
+				}
 			}
-			// 每个 topic + symbol 一条订阅，filters 为单对象格式
-			for _, symbol := range symbols {
-				cpm.subscriptions = append(cpm.subscriptions, map[string]any{
-					"topic":   topic,
-					"type":    "update",
-					"filters": fmt.Sprintf("{\"symbol\":\"%s%s\"}", strings.ToLower(symbol), SYMBOL_SUFFIX_CHAINLINK),
-				})
-			}
+		} else {
+			appendTwapSub(TOPIC_CHAINLINK_TWAP_THIRTY, sc)
+			appendTwapSub(TOPIC_CHAINLINK_TWAP_SIXTY, sc)
 		}
 	}
 
 	return &cpm
+}
+
+// buildTwapFilters 解析 symbol 的窗口后缀：btc 等价 btc_30（30s），btc_60 为 60s。
+// 返回 30s/60s 两个 topic 各自的 filters 数组字符串，没有 symbol 的窗口返回空串。
+func buildTwapFilters(symbols []string) (string, string) {
+	var s30, s60 []string
+	for _, symbol := range symbols {
+		lower := strings.ToLower(symbol)
+		base, window := symbol, ChainlinkTwapWindowThirty
+		switch {
+		case strings.HasSuffix(lower, "_60"):
+			base, window = symbol[:len(symbol)-3], ChainlinkTwapWindowSixty
+		case strings.HasSuffix(lower, "_30"):
+			base = symbol[:len(symbol)-3]
+		}
+		f := fmt.Sprintf("{\"symbol\":\"%s%s\"}", strings.ToLower(base), SYMBOL_SUFFIX_CHAINLINK)
+		if window == ChainlinkTwapWindowSixty {
+			s60 = append(s60, f)
+		} else {
+			s30 = append(s30, f)
+		}
+	}
+	filters := func(list []string) string {
+		if len(list) == 0 {
+			return ""
+		}
+		return fmt.Sprintf("[%s]", strings.Join(list, ","))
+	}
+	return filters(s30), filters(s60)
 }
 
 func (ep *CryptoPriceMonitor) Subscribe() <-chan ExternalPrice {
@@ -137,10 +175,11 @@ func (ep *CryptoPriceMonitor) Run(ctx context.Context) error {
 	}
 
 	ep.ws = utils.NewWSClient(utils.WSConfig{
-		URL:          ep.pmClient.cfg.Polymarket.LiveWSBaseURL,
-		PingInterval: 10 * time.Second,
-		Reconnect:    true,
-		MaxReconnect: 20,
+		URL:           ep.pmClient.cfg.Polymarket.LiveWSBaseURL,
+		PingInterval:  5 * time.Second,
+		TextHeartbeat: true, // ws-live-data 要求每 5s 发一次文本 PING
+		Reconnect:     true,
+		MaxReconnect:  20,
 	}, ep)
 
 	if err := ep.ws.Run(ctx); err != nil {
@@ -185,6 +224,12 @@ func (ep *CryptoPriceMonitor) handleMessage(msg string) {
 			log.Printf("[CryptoPriceMonitor] handleMessage panic: %v", r)
 		}
 	}()
+
+	// 订阅后服务器会回一条 type=subscribe 的 ack（带历史数据数组，topic 仍为 crypto_prices），
+	// 只有 type=update 的才是实时价格，其余一律忽略
+	if gjson.Get(msg, "type").String() != "update" {
+		return
+	}
 
 	topic := gjson.Get(msg, "topic").String()
 	switch topic {

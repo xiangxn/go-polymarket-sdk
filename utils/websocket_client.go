@@ -160,7 +160,7 @@ func (c *wsClient) Run(ctx context.Context) error {
 
 			retry++
 
-			log.Printf("[WSClient] reconnect attempt=%d", retry)
+			log.Printf("[WSClient] reconnect attempt=%d, err=%v", retry, err)
 
 			if !SleepWithCtx(ctx, c.cfg.ReconnectDelay) {
 				c.callOnClose()
