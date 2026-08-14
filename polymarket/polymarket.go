@@ -649,8 +649,8 @@ func (c *PolymarketClient) GetApiKeys() ([]string, error) {
 	var apiKeys []string
 	for _, item := range result.Get("apiKeys").Array() {
 		if s, ok := item.Value().(string); ok {
-				apiKeys = append(apiKeys, s)
-			}
+			apiKeys = append(apiKeys, s)
+		}
 	}
 	return apiKeys, nil
 }
@@ -827,13 +827,18 @@ func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
 	c.negRisk[tokenID] = negRisk
 }
 
-func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint) (float64, float64) {
+// https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=2026-08-14T06:10:00Z&variant=fiveminute&endDate=2026-08-14T06:15:00Z&twapEnabled=true&twapLookbackSeconds=60
+// {"openPrice":63263.639611640705,"closePrice":63233.40981220359,"timestamp":1786688164699,"completed":true,"incomplete":false,"cached":true}
+// 返回 openPrice, closePrice；接口数据未就绪时二者可能为 null（如时间未到 closePrice 为 null），此时返回 0
+func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
 	url := "https://polymarket.com/api/crypto/crypto-price"
 	params := map[string]string{
-		"symbol":         string(symbol),
-		"eventStartTime": utils.ToISOString(startTime),
-		"endDate":        utils.ToISOString(endDate),
-		"variant":        string(variant),
+		"symbol":              string(symbol),
+		"eventStartTime":      utils.ToISOString(startTime),
+		"endDate":             utils.ToISOString(endDate),
+		"variant":             string(variant),
+		"twapEnabled":         strconv.FormatBool(twapEnabled),
+		"twapLookbackSeconds": strconv.Itoa(twapLookbackSeconds),
 	}
 	result, err := c.Get(url, params, nil)
 	if err != nil {

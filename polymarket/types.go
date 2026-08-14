@@ -110,12 +110,13 @@ const (
 type CryptoPriceUint string
 
 const (
-	Fifteen  CryptoPriceUint = "fifteen"
-	Hourly   CryptoPriceUint = "hourly"
-	Fourhour CryptoPriceUint = "fourhour"
-	Daily    CryptoPriceUint = "daily"
-	Weekly   CryptoPriceUint = "weekly"
-	Monthly  CryptoPriceUint = "monthly"
+	Fiveminute CryptoPriceUint = "fiveminute"
+	Fifteen    CryptoPriceUint = "fifteen"
+	Hourly     CryptoPriceUint = "hourly"
+	Fourhour   CryptoPriceUint = "fourhour"
+	Daily      CryptoPriceUint = "daily"
+	Weekly     CryptoPriceUint = "weekly"
+	Monthly    CryptoPriceUint = "monthly"
 )
 
 type ResolvedInfo struct {

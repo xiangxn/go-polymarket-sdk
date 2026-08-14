@@ -293,7 +293,7 @@ func (ep *CryptoPriceMonitor) GetTwapPrice(symbol string, windowSeconds int64) f
 }
 
 // return openPrice,closePrice
-func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result) (float64, float64) {
+func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
 	tags := market.Get("tags").Array()
 	endDate := market.Get("endDate").String()
 	symbol, err := GetSymbol(tags)
@@ -309,7 +309,7 @@ func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result) (float64, flo
 	unit, err := GetSearchTimeUnit(u)
 	startTime := GetStartTime(u, endDate)
 	// log.Printf("symbol: %s, startTime: %s, endDate: %s, unit: %s", symbol, utils.ToISOString(startTime), utils.ToISOString(helper.TimeParse(endDate)), unit)
-	return ep.pmClient.FetchOpenPrice(symbol, startTime, utils.TimeParse(endDate), unit)
+	return ep.pmClient.FetchOpenPrice(symbol, startTime, utils.TimeParse(endDate), unit, twapEnabled, twapLookbackSeconds)
 }
 
 /***WSClient handler实现***/
