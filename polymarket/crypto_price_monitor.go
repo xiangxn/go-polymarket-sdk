@@ -78,7 +78,7 @@ func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, 
 
 	cpm := CryptoPriceMonitor{
 		pmClient:              pmClient,
-		priceCh:               make(chan ExternalPrice, 4096),
+		priceCh:               make(chan ExternalPrice, 65536),
 		binancePrices:         make(map[string]float64),
 		chainlinkPrices:       make(map[string]float64),
 		chainlinkTwap30Prices: make(map[string]float64),
