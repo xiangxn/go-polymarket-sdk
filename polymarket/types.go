@@ -129,3 +129,23 @@ type ResolvedInfo struct {
 	Timestamp      int64    `json:"timestamp"`
 	Tags           []string `json:"tags"`
 }
+
+// PriceChangeItem 单笔价格变化
+type PriceChangeItem struct {
+	AssetID string `json:"asset_id"`
+	Price   string `json:"price"`
+	Size    string `json:"size"`
+	Side    string `json:"side"`
+	Hash    string `json:"hash"`
+	BestBid string `json:"best_bid"`
+	BestAsk string `json:"best_ask"`
+}
+
+// PriceChangeInfo price_change 事件
+type PriceChangeInfo struct {
+	EventType    string            `json:"event_type"`
+	Market       string            `json:"market"`
+	PriceChanges []PriceChangeItem `json:"price_changes"`
+	// 触发时间戳，毫秒
+	Timestamp int64 `json:"timestamp"`
+}

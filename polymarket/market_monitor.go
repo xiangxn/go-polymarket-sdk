@@ -48,8 +48,9 @@ type MarketMonitor struct {
 	pmClient *PolymarketClient
 
 	// downstream consumer channel
-	orderBookCh chan *OrderBook
-	resolvedCh  chan *ResolvedInfo
+	orderBookCh    chan *OrderBook
+	resolvedCh     chan *ResolvedInfo
+	priceChangeCh  chan *PriceChangeInfo
 
 	// 是否存储Orderbook
 	isStore bool
@@ -65,6 +66,7 @@ func NewMarketMonitor(
 	return &MarketMonitor{
 		orderBookCh:          make(chan *OrderBook, 4096),
 		resolvedCh:           make(chan *ResolvedInfo, 4096),
+		priceChangeCh:        make(chan *PriceChangeInfo, 4096),
 		clobMarketWSSURL:     fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:             client,
 		isStore:              isStore,
@@ -78,6 +80,10 @@ func (mm *MarketMonitor) SubscribeOrderBook() <-chan *OrderBook {
 
 func (mm *MarketMonitor) SubscribeResolved() <-chan *ResolvedInfo {
 	return mm.resolvedCh
+}
+
+func (mm *MarketMonitor) SubscribePriceChange() <-chan *PriceChangeInfo {
+	return mm.priceChangeCh
 }
 
 func (mm *MarketMonitor) emitOrderBook(book *OrderBook) {
@@ -99,6 +105,28 @@ func (mm *MarketMonitor) emitOrderBook(book *OrderBook) {
 	case mm.orderBookCh <- book:
 	default:
 		log.Println("[MarketMonitor] orderBookCh full")
+	}
+}
+
+func (mm *MarketMonitor) emitPriceChange(info *PriceChangeInfo) {
+
+	// drop oldest
+	select {
+	case mm.priceChangeCh <- info:
+		return
+
+	default:
+	}
+
+	select {
+	case <-mm.priceChangeCh:
+	default:
+	}
+
+	select {
+	case mm.priceChangeCh <- info:
+	default:
+		log.Println("[MarketMonitor] priceChangeCh full")
 	}
 }
 
@@ -156,6 +184,8 @@ func (pm *MarketMonitor) handleMessage(msg []byte) {
 		pm.onOrderBook(&result)
 	case "market_resolved":
 		pm.onMarketResolved(&result)
+	case "price_change":
+		pm.onPriceChange(&result)
 	default:
 		// log.Printf("event_type: %s, %s", event_type, result.Get("winning_outcome").String())
 	}
@@ -216,6 +246,33 @@ func (pm *MarketMonitor) onOrderBook(info *gjson.Result) {
 	pm.updateOrderBook(book)
 
 	pm.emitOrderBook(book)
+}
+
+func (mm *MarketMonitor) onPriceChange(info *gjson.Result) {
+	priceChange := &PriceChangeInfo{
+		EventType: info.Get("event_type").String(),
+		Market:    info.Get("market").String(),
+		Timestamp: info.Get("timestamp").Int(),
+	}
+
+	changes := info.Get("price_changes").Array()
+
+	if len(changes) > 0 {
+		priceChange.PriceChanges = make([]PriceChangeItem, 0, len(changes))
+		for _, v := range changes {
+			priceChange.PriceChanges = append(priceChange.PriceChanges, PriceChangeItem{
+				AssetID: v.Get("asset_id").String(),
+				Price:   v.Get("price").String(),
+				Size:    v.Get("size").String(),
+				Side:    v.Get("side").String(),
+				Hash:    v.Get("hash").String(),
+				BestBid: v.Get("best_bid").String(),
+				BestAsk: v.Get("best_ask").String(),
+			})
+		}
+	}
+
+	mm.emitPriceChange(priceChange)
 }
 
 // immutable snapshot store
