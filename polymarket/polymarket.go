@@ -9,10 +9,12 @@ import (
 	"log"
 	"maps"
 	"math/big"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -34,6 +36,9 @@ type PolymarketClient struct {
 	muTickSizes sync.RWMutex
 	muFeeRates  sync.RWMutex
 	muNegRisk   sync.RWMutex
+
+	// 累计收到 429 并进入重试的次数(观测限流用)
+	RateLimitRetryCount atomic.Int64
 }
 
 func NewClient(cfg *Config) *PolymarketClient {
@@ -93,25 +98,63 @@ func (c *PolymarketClient) ClearNegRisk() {
 	c.negRisk = make(map[string]bool)
 }
 
+const (
+	defaultRateLimitMaxRetries = 3                      // 429 默认最大重试次数
+	defaultRateLimitBaseDelay  = 500 * time.Millisecond // 无 Retry-After 头时的基础退避间隔
+)
+
+// Get 发送 GET 请求；命中 429 限流时自动重试：
+// 优先等待响应 Retry-After 头（秒），缺失时按指数退避，重试次数由 cfg.RateLimitMaxRetries 控制
 func (c *PolymarketClient) Get(url string, params map[string]string, headers map[string]string) (*gjson.Result, error) {
-	request := c.http.R()
-	if params != nil {
-		request.SetQueryParams(params)
+	maxRetries := c.cfg.RateLimitMaxRetries
+	if maxRetries <= 0 {
+		maxRetries = defaultRateLimitMaxRetries
 	}
-	Headers.OverloadHeaders(resty.MethodGet, headers)
-	request.SetHeaders(headers)
-	if c.cfg.HttpDebug {
-		request.SetDebug(true)
+	baseDelay := c.cfg.RateLimitBaseDelay
+	if baseDelay <= 0 {
+		baseDelay = defaultRateLimitBaseDelay
 	}
-	resp, err := request.Get(url)
-	if err != nil {
-		return nil, err
+
+	for attempt := 0; ; attempt++ {
+		request := c.http.R()
+		if params != nil {
+			request.SetQueryParams(params)
+		}
+		Headers.OverloadHeaders(resty.MethodGet, headers)
+		request.SetHeaders(headers)
+		if c.cfg.HttpDebug {
+			request.SetDebug(true)
+		}
+		resp, err := request.Get(url)
+		if err != nil {
+			return nil, err
+		}
+		if resp.StatusCode() == http.StatusTooManyRequests && attempt < maxRetries {
+			c.RateLimitRetryCount.Add(1)
+			delay := rateLimitDelay(resp.Header().Get("Retry-After"), attempt, baseDelay)
+			log.Printf("[PolymarketClient] 429 rate limited: %s, retry %d/%d after %s", url, attempt+1, maxRetries, delay)
+			time.Sleep(delay)
+			continue
+		}
+		if resp.StatusCode() >= 400 {
+			return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode(), resp.String())
+		}
+		result := gjson.ParseBytes(resp.Bytes())
+		return &result, nil
 	}
-	if resp.StatusCode() >= 400 {
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode(), resp.String())
+}
+
+// rateLimitDelay 计算 429 重试等待时间：优先 Retry-After 头（秒），否则指数退避。
+// 退避基础上附加 0~100% 随机抖动，把并发调用者的重试散开到不同秒级窗口，
+// 避免同时重试再次顶满限流令牌桶(实测 Polymarket 1015 限流窗口很短,散开后即可通过)
+func rateLimitDelay(retryAfter string, attempt int, baseDelay time.Duration) time.Duration {
+	if retryAfter != "" {
+		if secs, err := strconv.Atoi(retryAfter); err == nil && secs > 0 {
+			return time.Duration(secs) * time.Second
+		}
 	}
-	result := gjson.ParseBytes(resp.Bytes())
-	return &result, nil
+	delay := baseDelay << attempt
+	return delay + time.Duration(rand.Int63n(int64(delay)+1))
 }
 
 func (c *PolymarketClient) Post(url string, body any, headers map[string]string) (*gjson.Result, error) {
@@ -831,7 +874,10 @@ func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
 // {"openPrice":63263.639611640705,"closePrice":63233.40981220359,"timestamp":1786688164699,"completed":true,"incomplete":false,"cached":true}
 // 返回 openPrice, closePrice；接口数据未就绪时二者可能为 null（如时间未到 closePrice 为 null），此时返回 0
 func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
-	url := "https://polymarket.com/api/crypto/crypto-price"
+	url := c.cfg.Polymarket.CryptoPriceURL
+	if url == "" { // 兼容未配置的旧 config
+		url = "https://polymarket.com/api/crypto/crypto-price"
+	}
 	params := map[string]string{
 		"symbol":              string(symbol),
 		"eventStartTime":      utils.ToISOString(startTime),

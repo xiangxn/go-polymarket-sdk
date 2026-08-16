@@ -23,6 +23,9 @@ func DefaultConfig() *Config {
 		HttpTimeout: 10 * time.Second,
 		SocksProxy:  "",
 		HttpDebug:   false,
+
+		RateLimitMaxRetries: 3,
+		RateLimitBaseDelay:  500 * time.Millisecond,
 		Polymarket: PolymarketConfig{
 			ChainID:        137,
 			ClobBaseURL:    "https://clob.polymarket.com",
@@ -33,6 +36,8 @@ func DefaultConfig() *Config {
 			DataAPIBaseURL: "https://data-api.polymarket.com",
 
 			SignatureType: orders.POLY_GNOSIS_SAFE,
+
+			CryptoPriceURL: "https://polymarket.com/api/crypto/crypto-price",
 
 			BuilderCode:  nil,
 			OwnerKey:     "1111111111111111111111111111111111111111111111111111111111111111",

@@ -21,6 +21,9 @@ type PolymarketConfig struct {
 
 	SignatureType orders.SignatureType `mapstructure:"signature_type"`
 
+	// 加密价格接口地址，为空时使用默认 https://polymarket.com/api/crypto/crypto-price
+	CryptoPriceURL string `mapstructure:"crypto_price_url"`
+
 	OwnerKey     string              `mapstructure:"owner_key"`
 	BuilderCode  *string             `mapstructure:"builder_code"`
 	CLOBCreds    *model.ApiKeyCreds  `mapstructure:"clob_creds"`
@@ -32,6 +35,10 @@ type Config struct {
 	HttpTimeout time.Duration `mapstructure:"http_timeout"`
 	SocksProxy  string        `mapstructure:"socks_proxy"`
 	HttpDebug   bool          `mapstructure:"http_debug"`
+
+	// 429 限流重试配置，0 使用默认值（3 次重试、500ms 基础退避）
+	RateLimitMaxRetries int           `mapstructure:"rate_limit_max_retries"`
+	RateLimitBaseDelay  time.Duration `mapstructure:"rate_limit_base_delay"`
 
 	Polymarket PolymarketConfig `mapstructure:"polymarket"`
 }
