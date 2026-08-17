@@ -59,7 +59,7 @@ type CryptoPriceMonitor struct {
 
 	priceCh chan ExternalPrice
 
-	ctx   context.Context // Run 传入的 ctx，供 FetchOpenPrice 等 HTTP 请求继承取消/超时
+	ctx   context.Context // Run 的 ctx（剥离取消、保留 deadline），供 FetchOpenPrice 等 HTTP 请求继承超时
 	ctxMU sync.RWMutex
 }
 
@@ -173,8 +173,10 @@ func (ep *CryptoPriceMonitor) Run(ctx context.Context) error {
 	log.Println("[CryptoPriceMonitor] Run start")
 	defer log.Println("[CryptoPriceMonitor] Run exit")
 
+	// 剥离取消信号、保留 deadline：monitor 停止后 FetchOpenPrice 等查询仍可用，
+	// 同时仍受调用方 deadline 约束（429 等待会截断到 deadline 内，不会无限挂起）
 	ep.ctxMU.Lock()
-	ep.ctx = ctx
+	ep.ctx = context.WithoutCancel(ctx)
 	ep.ctxMU.Unlock()
 
 	if ep.ws != nil && ep.ws.IsAlive() {
