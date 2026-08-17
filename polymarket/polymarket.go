@@ -2,6 +2,7 @@ package polymarket
 
 import (
 	"bytes"
+	"context"
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
@@ -99,13 +100,26 @@ func (c *PolymarketClient) ClearNegRisk() {
 }
 
 const (
-	defaultRateLimitMaxRetries = 3                      // 429 默认最大重试次数
-	defaultRateLimitBaseDelay  = 500 * time.Millisecond // 无 Retry-After 头时的基础退避间隔
+	defaultRateLimitMaxRetries  = 3                       // 429 默认最大重试次数
+	defaultRateLimitBaseDelay   = 1000 * time.Millisecond // 无 Retry-After 头时的基础退避间隔
+	defaultRateLimitRetryBudget = 10 * time.Second        // 429 重试等待总预算,超出的 Retry-After 被截断
 )
 
-// Get 发送 GET 请求；命中 429 限流时自动重试：
-// 优先等待响应 Retry-After 头（秒），缺失时按指数退避，重试次数由 cfg.RateLimitMaxRetries 控制
+// Get 发送 GET 请求；命中 429 限流时自动重试，详见 GetContext。
+// 等价于 GetContext(context.Background(), ...)，不需要取消/超时控制时使用。
 func (c *PolymarketClient) Get(url string, params map[string]string, headers map[string]string) (*gjson.Result, error) {
+	return c.GetContext(context.Background(), url, params, headers)
+}
+
+// GetContext 发送带 context 的 GET 请求；命中 429 限流时自动重试：
+// 优先等待响应 Retry-After 头（秒），缺失时按指数退避，重试次数由 cfg.RateLimitMaxRetries 控制。
+// 自首次 429 起的总等待时长受 cfg.RateLimitRetryBudget 约束：Retry-After 超出剩余预算时被
+// 截断到剩余预算内，预算耗尽则直接返回错误，避免因异常 Retry-After 睡过久。
+// 请求与重试等待均感知 ctx：ctx 取消/到期会立即返回 ctx 的错误，等待不会越过 ctx 的 deadline。
+func (c *PolymarketClient) GetContext(ctx context.Context, url string, params map[string]string, headers map[string]string) (*gjson.Result, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	maxRetries := c.cfg.RateLimitMaxRetries
 	if maxRetries <= 0 {
 		maxRetries = defaultRateLimitMaxRetries
@@ -114,9 +128,15 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 	if baseDelay <= 0 {
 		baseDelay = defaultRateLimitBaseDelay
 	}
+	budget := c.cfg.RateLimitRetryBudget
+	if budget <= 0 {
+		budget = defaultRateLimitRetryBudget
+	}
+	var retryDeadline time.Time // 首次 429 时初始化,约束总等待预算
 
 	for attempt := 0; ; attempt++ {
 		request := c.http.R()
+		request.SetContext(ctx)
 		if params != nil {
 			request.SetQueryParams(params)
 		}
@@ -131,9 +151,35 @@ func (c *PolymarketClient) Get(url string, params map[string]string, headers map
 		}
 		if resp.StatusCode() == http.StatusTooManyRequests && attempt < maxRetries {
 			c.RateLimitRetryCount.Add(1)
+			if retryDeadline.IsZero() {
+				retryDeadline = time.Now().Add(budget)
+			}
+			remaining := time.Until(retryDeadline)
+			if deadline, ok := ctx.Deadline(); ok { // 不越过调用方 ctx 的 deadline
+				if ctxRemaining := time.Until(deadline); ctxRemaining < remaining {
+					remaining = ctxRemaining
+				}
+			}
+			if remaining <= 0 {
+				if err := ctx.Err(); err != nil {
+					log.Printf("[PolymarketClient] 429 retry aborted by ctx: %s: %v", url, err)
+					return nil, err
+				}
+				log.Printf("[PolymarketClient] 429 retry budget exhausted: %s", url)
+				return nil, fmt.Errorf("API request failed with status %d: %s (rate limit retry budget exhausted)", resp.StatusCode(), resp.String())
+			}
 			delay := rateLimitDelay(resp.Header().Get("Retry-After"), attempt, baseDelay)
+			if delay > remaining { // 截断 Retry-After/退避到剩余时间内,保证不会无限期睡下去
+				log.Printf("[PolymarketClient] 429 wait %s exceeds remaining %s, truncated", delay, remaining)
+				delay = remaining
+			}
 			log.Printf("[PolymarketClient] 429 rate limited: %s, retry %d/%d after %s", url, attempt+1, maxRetries, delay)
-			time.Sleep(delay)
+			select { // 等待期间感知 ctx 取消/到期
+			case <-ctx.Done():
+				log.Printf("[PolymarketClient] 429 retry aborted by ctx: %s: %v", url, ctx.Err())
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
 			continue
 		}
 		if resp.StatusCode() >= 400 {
@@ -870,10 +916,16 @@ func (c *PolymarketClient) SetNegRisk(tokenID string, negRisk bool) {
 	c.negRisk[tokenID] = negRisk
 }
 
+// FetchOpenPrice 等价于 FetchOpenPriceContext(context.Background(), ...)，不需要取消/超时控制时使用。
+func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
+	return c.FetchOpenPriceContext(context.Background(), symbol, startTime, endDate, variant, twapEnabled, twapLookbackSeconds)
+}
+
+// FetchOpenPriceContext 同 FetchOpenPrice，请求与 429 重试等待均感知 ctx（ctx 取消时兜底返回 0, 0）。
 // https://polymarket.com/api/crypto/crypto-price?symbol=BTC&eventStartTime=2026-08-14T06:10:00Z&variant=fiveminute&endDate=2026-08-14T06:15:00Z&twapEnabled=true&twapLookbackSeconds=60
 // {"openPrice":63263.639611640705,"closePrice":63233.40981220359,"timestamp":1786688164699,"completed":true,"incomplete":false,"cached":true}
 // 返回 openPrice, closePrice；接口数据未就绪时二者可能为 null（如时间未到 closePrice 为 null），此时返回 0
-func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
+func (c *PolymarketClient) FetchOpenPriceContext(ctx context.Context, symbol CryptoPriceSymbol, startTime time.Time, endDate time.Time, variant CryptoPriceUint, twapEnabled bool, twapLookbackSeconds int) (float64, float64) {
 	url := c.cfg.Polymarket.CryptoPriceURL
 	if url == "" { // 兼容未配置的旧 config
 		url = "https://polymarket.com/api/crypto/crypto-price"
@@ -886,7 +938,7 @@ func (c *PolymarketClient) FetchOpenPrice(symbol CryptoPriceSymbol, startTime ti
 		"twapEnabled":         strconv.FormatBool(twapEnabled),
 		"twapLookbackSeconds": strconv.Itoa(twapLookbackSeconds),
 	}
-	result, err := c.Get(url, params, nil)
+	result, err := c.GetContext(ctx, url, params, nil)
 	if err != nil {
 		log.Printf("FetchOpenPrice error: %v", err)
 		return 0, 0

@@ -1,6 +1,8 @@
 package polymarket
 
 import (
+	"context"
+	"errors"
 	"log"
 	"net/http"
 	"net/http/httptest"
@@ -90,6 +92,120 @@ func TestGetRateLimitRetryExhausted(t *testing.T) {
 	}
 	if count.Load() != 3 { // 1 次原始请求 + 2 次重试
 		t.Fatalf("request count: %d, want 3", count.Load())
+	}
+}
+
+// TestGetRateLimitRetryBudgetTruncation Retry-After 远超剩余预算时被截断:
+// Get 在预算耗尽后返回错误,不会按 Retry-After 睡满(无需网络)
+func TestGetRateLimitRetryBudgetTruncation(t *testing.T) {
+	var count atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count.Add(1)
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.RateLimitRetryBudget = 200 * time.Millisecond
+	client := NewClient(cfg)
+	start := time.Now()
+	_, err := client.Get(server.URL, nil, nil)
+	elapsed := time.Since(start)
+	if err == nil || !strings.Contains(err.Error(), "429") {
+		t.Fatalf("want 429 error, got %v", err)
+	}
+	if elapsed >= time.Second {
+		t.Fatalf("elapsed %s, Retry-After 未按剩余预算截断", elapsed)
+	}
+	if count.Load() != 2 { // 首次 429 + 截断后最后一次重试
+		t.Fatalf("request count: %d, want 2", count.Load())
+	}
+}
+
+// TestGetContextCancelDuringRetrySleep ctx 在 429 重试等待期间到期时,
+// GetContext 立即返回 DeadlineExceeded,不会睡满 Retry-After(无需网络)
+func TestGetContextCancelDuringRetrySleep(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	client := NewClient(DefaultConfig())
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	_, err := client.GetContext(ctx, server.URL, nil, nil)
+	elapsed := time.Since(start)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("want context.DeadlineExceeded, got %v", err)
+	}
+	if elapsed >= time.Second {
+		t.Fatalf("elapsed %s, ctx 到期未中断重试等待", elapsed)
+	}
+}
+
+// TestGetRateLimitRetryBudgetTruncationSuccess 超出预算的 Retry-After 被截断后,
+// 最后一次重试仍可在预算内成功拿到结果(无需网络)
+func TestGetRateLimitRetryBudgetTruncationSuccess(t *testing.T) {
+	var count atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if count.Add(1) == 1 {
+			w.Header().Set("Retry-After", "3600")
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.RateLimitRetryBudget = 300 * time.Millisecond
+	client := NewClient(cfg)
+	start := time.Now()
+	result, err := client.Get(server.URL, nil, nil)
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("Get error: %v", err)
+	}
+	if !result.Get("ok").Bool() {
+		t.Fatalf("unexpected result: %s", result.Raw)
+	}
+	if elapsed >= time.Second {
+		t.Fatalf("elapsed %s, Retry-After 未按剩余预算截断", elapsed)
+	}
+	if count.Load() != 2 { // 首次 429 + 截断后的最后一次重试
+		t.Fatalf("request count: %d, want 2", count.Load())
+	}
+}
+
+// TestFetchOpenPriceContextCancel 429 等待期间 ctx 到期,
+// FetchOpenPriceContext 快速兜底返回 (0, 0),不会睡满 Retry-After(无需网络)
+func TestFetchOpenPriceContextCancel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "3600")
+		w.WriteHeader(http.StatusTooManyRequests)
+	}))
+	defer server.Close()
+
+	cfg := DefaultConfig()
+	cfg.Polymarket.CryptoPriceURL = server.URL
+	client := NewClient(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	start := time.Now()
+	openPrice, closePrice := client.FetchOpenPriceContext(ctx, BTC,
+		time.Now().Add(-10*time.Minute), time.Now().Add(-5*time.Minute),
+		Fiveminute, true, 60)
+	elapsed := time.Since(start)
+	if openPrice != 0 || closePrice != 0 {
+		t.Fatalf("want (0, 0), got (%f, %f)", openPrice, closePrice)
+	}
+	if elapsed >= time.Second {
+		t.Fatalf("elapsed %s, ctx 到期未中断重试等待", elapsed)
 	}
 }
 

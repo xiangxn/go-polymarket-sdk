@@ -36,9 +36,10 @@ type Config struct {
 	SocksProxy  string        `mapstructure:"socks_proxy"`
 	HttpDebug   bool          `mapstructure:"http_debug"`
 
-	// 429 限流重试配置，0 使用默认值（3 次重试、500ms 基础退避）
-	RateLimitMaxRetries int           `mapstructure:"rate_limit_max_retries"`
-	RateLimitBaseDelay  time.Duration `mapstructure:"rate_limit_base_delay"`
+	// 429 限流重试配置，0 使用默认值（3 次重试、500ms 基础退避、10s 总等待预算）
+	RateLimitMaxRetries  int           `mapstructure:"rate_limit_max_retries"`
+	RateLimitBaseDelay   time.Duration `mapstructure:"rate_limit_base_delay"`
+	RateLimitRetryBudget time.Duration `mapstructure:"rate_limit_retry_budget"`
 
 	Polymarket PolymarketConfig `mapstructure:"polymarket"`
 }

@@ -58,6 +58,9 @@ type CryptoPriceMonitor struct {
 	chainlinkTwapMU sync.RWMutex
 
 	priceCh chan ExternalPrice
+
+	ctx   context.Context // Run 传入的 ctx，供 FetchOpenPrice 等 HTTP 请求继承取消/超时
+	ctxMU sync.RWMutex
 }
 
 func NewCryptoPriceMonitor(pmClient *PolymarketClient, monitorType MonitorType, symbols ...string) *CryptoPriceMonitor {
@@ -169,6 +172,10 @@ func (ep *CryptoPriceMonitor) Subscribe() <-chan ExternalPrice {
 func (ep *CryptoPriceMonitor) Run(ctx context.Context) error {
 	log.Println("[CryptoPriceMonitor] Run start")
 	defer log.Println("[CryptoPriceMonitor] Run exit")
+
+	ep.ctxMU.Lock()
+	ep.ctx = ctx
+	ep.ctxMU.Unlock()
 
 	if ep.ws != nil && ep.ws.IsAlive() {
 		return nil
@@ -354,7 +361,13 @@ func (ep *CryptoPriceMonitor) FetchOpenPrice(market *gjson.Result, twapEnabled b
 	unit, err := GetSearchTimeUnit(u)
 	startTime := GetStartTime(u, endDate)
 	// log.Printf("symbol: %s, startTime: %s, endDate: %s, unit: %s", symbol, utils.ToISOString(startTime), utils.ToISOString(helper.TimeParse(endDate)), unit)
-	return ep.pmClient.FetchOpenPrice(symbol, startTime, utils.TimeParse(endDate), unit, twapEnabled, twapLookbackSeconds)
+	ep.ctxMU.RLock()
+	ctx := ep.ctx
+	ep.ctxMU.RUnlock()
+	if ctx == nil { // 未调用过 Run 时退化为无取消控制
+		ctx = context.Background()
+	}
+	return ep.pmClient.FetchOpenPriceContext(ctx, symbol, startTime, utils.TimeParse(endDate), unit, twapEnabled, twapLookbackSeconds)
 }
 
 /***WSClient handler实现***/
