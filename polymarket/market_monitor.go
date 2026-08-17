@@ -48,9 +48,17 @@ type MarketMonitor struct {
 	pmClient *PolymarketClient
 
 	// downstream consumer channel
-	orderBookCh    chan *OrderBook
-	resolvedCh     chan *ResolvedInfo
-	priceChangeCh  chan *PriceChangeInfo
+	orderBookCh       chan *OrderBook
+	resolvedCh        chan *ResolvedInfo
+	priceChangeCh     chan *PriceChangeInfo
+	lastTradePriceCh  chan *LastTradePriceInfo
+
+	// 事件解析开关:仅在有人订阅后才解析对应事件,避免无人消费时的无效解析
+	// book 事件额外受 isStore 控制,见 handleMessage
+	orderBookSubscribed      atomic.Bool
+	resolvedSubscribed       atomic.Bool
+	priceChangeSubscribed    atomic.Bool
+	lastTradePriceSubscribed atomic.Bool
 
 	// 是否存储Orderbook
 	isStore bool
@@ -67,6 +75,7 @@ func NewMarketMonitor(
 		orderBookCh:          make(chan *OrderBook, 4096),
 		resolvedCh:           make(chan *ResolvedInfo, 4096),
 		priceChangeCh:        make(chan *PriceChangeInfo, 4096),
+		lastTradePriceCh:     make(chan *LastTradePriceInfo, 4096),
 		clobMarketWSSURL:     fmt.Sprintf("%s/ws/market", wsBaseUrl),
 		pmClient:             client,
 		isStore:              isStore,
@@ -75,15 +84,46 @@ func NewMarketMonitor(
 }
 
 func (mm *MarketMonitor) SubscribeOrderBook() <-chan *OrderBook {
+	mm.orderBookSubscribed.Store(true)
 	return mm.orderBookCh
 }
 
 func (mm *MarketMonitor) SubscribeResolved() <-chan *ResolvedInfo {
+	mm.resolvedSubscribed.Store(true)
 	return mm.resolvedCh
 }
 
 func (mm *MarketMonitor) SubscribePriceChange() <-chan *PriceChangeInfo {
+	mm.priceChangeSubscribed.Store(true)
 	return mm.priceChangeCh
+}
+
+func (mm *MarketMonitor) SubscribeLastTradePrice() <-chan *LastTradePriceInfo {
+	mm.lastTradePriceSubscribed.Store(true)
+	return mm.lastTradePriceCh
+}
+
+// 以下方法仅重置解析开关,channel 中已积压的事件不清理,由使用者自行处理。
+// 重置后重新 Subscribe 即恢复解析。
+
+// UnsubscribeOrderBook 停止解析 book 事件(注意:isStore 为 true 时仍会解析并入库)
+func (mm *MarketMonitor) UnsubscribeOrderBook() {
+	mm.orderBookSubscribed.Store(false)
+}
+
+// UnsubscribeResolved 停止解析 market_resolved 事件
+func (mm *MarketMonitor) UnsubscribeResolved() {
+	mm.resolvedSubscribed.Store(false)
+}
+
+// UnsubscribePriceChange 停止解析 price_change 事件
+func (mm *MarketMonitor) UnsubscribePriceChange() {
+	mm.priceChangeSubscribed.Store(false)
+}
+
+// UnsubscribeLastTradePrice 停止解析 last_trade_price 事件
+func (mm *MarketMonitor) UnsubscribeLastTradePrice() {
+	mm.lastTradePriceSubscribed.Store(false)
 }
 
 func (mm *MarketMonitor) emitOrderBook(book *OrderBook) {
@@ -127,6 +167,28 @@ func (mm *MarketMonitor) emitPriceChange(info *PriceChangeInfo) {
 	case mm.priceChangeCh <- info:
 	default:
 		log.Println("[MarketMonitor] priceChangeCh full")
+	}
+}
+
+func (mm *MarketMonitor) emitLastTradePrice(info *LastTradePriceInfo) {
+
+	// drop oldest
+	select {
+	case mm.lastTradePriceCh <- info:
+		return
+
+	default:
+	}
+
+	select {
+	case <-mm.lastTradePriceCh:
+	default:
+	}
+
+	select {
+	case mm.lastTradePriceCh <- info:
+	default:
+		log.Println("[MarketMonitor] lastTradePriceCh full")
 	}
 }
 
@@ -179,13 +241,24 @@ func (pm *MarketMonitor) handleMessage(msg []byte) {
 
 	event_type := result.Get("event_type").String()
 
+	// 懒解析:对应事件无人订阅时直接跳过,省去 gjson 解析与结构体分配
 	switch event_type {
 	case "book":
-		pm.onOrderBook(&result)
+		if pm.orderBookSubscribed.Load() || pm.isStore {
+			pm.onOrderBook(&result)
+		}
 	case "market_resolved":
-		pm.onMarketResolved(&result)
+		if pm.resolvedSubscribed.Load() {
+			pm.onMarketResolved(&result)
+		}
 	case "price_change":
-		pm.onPriceChange(&result)
+		if pm.priceChangeSubscribed.Load() {
+			pm.onPriceChange(&result)
+		}
+	case "last_trade_price":
+		if pm.lastTradePriceSubscribed.Load() {
+			pm.onLastTradePrice(&result)
+		}
 	default:
 		// log.Printf("event_type: %s, %s", event_type, result.Get("winning_outcome").String())
 	}
@@ -273,6 +346,22 @@ func (mm *MarketMonitor) onPriceChange(info *gjson.Result) {
 	}
 
 	mm.emitPriceChange(priceChange)
+}
+
+func (mm *MarketMonitor) onLastTradePrice(info *gjson.Result) {
+	lastTradePrice := &LastTradePriceInfo{
+		EventType:       info.Get("event_type").String(),
+		AssetID:         info.Get("asset_id").String(),
+		Market:          info.Get("market").String(),
+		Price:           info.Get("price").String(),
+		Size:            info.Get("size").String(),
+		FeeRateBps:      info.Get("fee_rate_bps").String(),
+		Side:            info.Get("side").String(),
+		TransactionHash: info.Get("transaction_hash").String(),
+		Timestamp:       info.Get("timestamp").Int(),
+	}
+
+	mm.emitLastTradePrice(lastTradePrice)
 }
 
 // immutable snapshot store

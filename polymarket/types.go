@@ -149,3 +149,17 @@ type PriceChangeInfo struct {
 	// 触发时间戳，毫秒
 	Timestamp int64 `json:"timestamp"`
 }
+
+// LastTradePriceInfo last_trade_price 事件
+type LastTradePriceInfo struct {
+	EventType       string `json:"event_type"`
+	AssetID         string `json:"asset_id"`
+	Market          string `json:"market"`
+	Price           string `json:"price"`
+	Size            string `json:"size"`
+	FeeRateBps      string `json:"fee_rate_bps"`
+	Side            string `json:"side"`
+	TransactionHash string `json:"transaction_hash"`
+	// 触发时间戳，毫秒
+	Timestamp int64 `json:"timestamp"`
+}
