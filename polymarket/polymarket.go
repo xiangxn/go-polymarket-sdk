@@ -100,7 +100,7 @@ func (c *PolymarketClient) ClearNegRisk() {
 }
 
 const (
-	defaultRateLimitMaxRetries  = 3                       // 429 默认最大重试次数
+	defaultRateLimitMaxRetries  = 6                       // 429 默认最大重试次数
 	defaultRateLimitBaseDelay   = 1000 * time.Millisecond // 无 Retry-After 头时的基础退避间隔
 	defaultRateLimitRetryBudget = 10 * time.Second        // 429 重试等待总预算,超出的 Retry-After 被截断
 )
