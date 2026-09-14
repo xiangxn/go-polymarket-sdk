@@ -59,10 +59,11 @@ func (tm *TradeMonitor) Run(ctx context.Context) error {
 	}
 
 	tm.ws = utils.NewWSClient(utils.WSConfig{
-		URL:          tm.clobUserWSSURL,
-		PingInterval: 10 * time.Second,
-		Reconnect:    true,
-		MaxReconnect: 20,
+		URL:           tm.clobUserWSSURL,
+		PingInterval:  10 * time.Second,
+		Reconnect:     true,
+		MaxReconnect:  20,
+		TextHeartbeat: true,
 	}, tm)
 
 	return tm.ws.Run(ctx)

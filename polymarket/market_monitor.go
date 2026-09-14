@@ -48,10 +48,10 @@ type MarketMonitor struct {
 	pmClient *PolymarketClient
 
 	// downstream consumer channel
-	orderBookCh       chan *OrderBook
-	resolvedCh        chan *ResolvedInfo
-	priceChangeCh     chan *PriceChangeInfo
-	lastTradePriceCh  chan *LastTradePriceInfo
+	orderBookCh      chan *OrderBook
+	resolvedCh       chan *ResolvedInfo
+	priceChangeCh    chan *PriceChangeInfo
+	lastTradePriceCh chan *LastTradePriceInfo
 
 	// 事件解析开关:仅在有人订阅后才解析对应事件,避免无人消费时的无效解析
 	// book 事件额外受 isStore 控制,见 handleMessage
@@ -214,6 +214,7 @@ func (pm *MarketMonitor) Run(ctx context.Context) error {
 			MaxReconnect:   20,
 			MsgBufferSize:  32768,
 			ReadBufferSize: 65536,
+			TextHeartbeat:  true,
 		},
 		pm,
 	)
