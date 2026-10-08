@@ -47,16 +47,34 @@ func NewClient(cfg *Config) *PolymarketClient {
 		MaxIdleConns:        200,
 		MaxIdleConnsPerHost: 200,
 		IdleConnTimeout:     120 * time.Second,
+		// TLS 配置必须挂在「最终被使用的」transport 上。
+		// 不要用 resty 的 SetTLSClientConfig：它只改当下那个 transport，
+		// 之后 SetTransport 整体替换时配置会被丢掉（v0.7.2 的真实 bug）。
+		TLSClientConfig: &tls.Config{
+			MinVersion: tls.VersionTLS12,
+			// 允许 session resumption
+			ClientSessionCache: tls.NewLRUClientSessionCache(128),
+		},
 	}
 	if cfg.SocksProxy == "" {
 		transport.Proxy = http.ProxyFromEnvironment
-		transport.ForceAttemptHTTP2 = true
 	}
-	client := resty.New().SetTLSClientConfig(&tls.Config{
-		MinVersion: tls.VersionTLS12,
-		// 允许 session resumption
-		ClientSessionCache: tls.NewLRUClientSessionCache(128),
-	}).SetTransport(transport)
+
+	if cfg.DisableHTTP2 {
+		// 强制 HTTP/1.1（clob 的 Cloudflare 拦 Go 的 h2，见 Config.DisableHTTP2 注释）。
+		// 两道保险：
+		//   ① Protocols 是 Go 1.24+ 的显式协议开关（net/http 内部优先读它）；
+		//   ② NextProtos 去掉 "h2"，让 ALPN 只协商 http/1.1。
+		transport.ForceAttemptHTTP2 = false
+		transport.Protocols = new(http.Protocols)
+		transport.Protocols.SetHTTP1(true)
+		transport.TLSClientConfig.NextProtos = []string{"http/1.1"}
+	} else if cfg.SocksProxy == "" {
+		transport.ForceAttemptHTTP2 = true // 与原行为一致（socks 分支原本就不开 h2）
+	}
+
+	// 顺序：transport 备齐（含 TLS 配置）后一次性交给 resty
+	client := resty.New().SetTransport(transport)
 
 	if cfg.SocksProxy != "" {
 		client.SetProxy(cfg.SocksProxy)

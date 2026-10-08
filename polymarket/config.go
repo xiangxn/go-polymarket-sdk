@@ -36,6 +36,11 @@ type Config struct {
 	SocksProxy  string        `mapstructure:"socks_proxy"`
 	HttpDebug   bool          `mapstructure:"http_debug"`
 
+	// DisableHTTP2 强制 HTTP/1.1（关闭 HTTP/2）。
+	// 背景：clob.polymarket.com 的 Cloudflare 会 403 拦截 Go 的 HTTP/2 客户端指纹
+	// （同 IP 同分钟实测：curl h2 / Go h1.1 全过，Go h2 全拦）⇒ 生产环境保持 true。
+	DisableHTTP2 bool `mapstructure:"disable_http2"`
+
 	// 429 限流重试配置，0 使用默认值（3 次重试、500ms 基础退避、10s 总等待预算）
 	RateLimitMaxRetries  int           `mapstructure:"rate_limit_max_retries"`
 	RateLimitBaseDelay   time.Duration `mapstructure:"rate_limit_base_delay"`

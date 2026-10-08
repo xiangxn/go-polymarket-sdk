@@ -20,9 +20,10 @@ func (c *PolymarketConfig) HasRelayerAuth() bool {
 
 func DefaultConfig() *Config {
 	return &Config{
-		HttpTimeout: 10 * time.Second,
-		SocksProxy:  "",
-		HttpDebug:   false,
+		HttpTimeout:  10 * time.Second,
+		SocksProxy:   "",
+		HttpDebug:    false,
+		DisableHTTP2: true,
 
 		RateLimitMaxRetries: 3,
 		RateLimitBaseDelay:  500 * time.Millisecond,
