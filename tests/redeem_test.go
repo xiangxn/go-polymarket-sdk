@@ -24,7 +24,11 @@ func TestRedeem(t *testing.T) {
 	funderAddress := os.Getenv("FUNDERADDRESS")
 	client := polymarket.NewClient(config)
 
-	positions, err := client.SearchPositions(funderAddress, true, 100)
+	positions, err := client.SearchPositions(&polymarket.PositionParams{
+		User:   funderAddress,
+		Status: polymarket.PositionRedeemable,
+		Limit:  1000,
+	}, false, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,18 +37,25 @@ func TestRedeem(t *testing.T) {
 	conditionIds := []string{}
 	negRisks := []bool{}
 	amounts := [][]*big.Int{}
-	for _, position := range positions.Array() {
-		conditionIds = append(conditionIds, position.Get("conditionId").String())
-		negRisk := position.Get("negativeRisk").Bool()
+	for _, position := range positions {
+		negRisk := position.NegativeRisk
+		var amount []*big.Int
 		if negRisk {
+			// v2 用 outcome_index=999 表示服务端无法判定结果归属，此时无法按下标组装金额
+			if position.OutcomeIndex > 1 {
+				t.Logf("skip %s: outcome_index=%d", position.ConditionId, position.OutcomeIndex)
+				continue
+			}
 			ams := []*big.Int{new(big.Int).SetInt64(0), new(big.Int).SetInt64(0)}
-			value, _ := utils.ParseUnits(position.Get("size").String(), constants.CollateralTokenDecimals)
-			ams[position.Get("outcomeIndex").Int()] = value
-			amounts = append(amounts, ams)
+			value, _ := utils.ParseUnits(utils.FloatToString(position.CurrentSize, 0), constants.CollateralTokenDecimals)
+			ams[position.OutcomeIndex] = value
+			amount = ams
 		} else {
-			amounts = append(amounts, []*big.Int{})
+			amount = []*big.Int{}
 		}
+		conditionIds = append(conditionIds, position.ConditionId)
 		negRisks = append(negRisks, negRisk)
+		amounts = append(amounts, amount)
 	}
 
 	// if len(conditionIds) <= 0 {

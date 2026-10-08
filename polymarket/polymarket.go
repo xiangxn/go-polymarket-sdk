@@ -884,27 +884,96 @@ func (c *PolymarketClient) CancelMarketOrders(payload *orders.OrderMarketCancelP
 	return c.Del(url, nil, body, headers)
 }
 
-func (c *PolymarketClient) SearchPositions(proxyWallet string, redeemable bool, limit int) (*gjson.Result, error) {
-	wallet := c.cfg.Polymarket.FunderAddress
-	if proxyWallet != "" {
-		wallet = proxyWallet
+// SearchPositions 查询仓位，走 Data API v2 的 /v2/positions（v1 的 /positions 将于 2026-10-24 下线）。
+// params.User 留空时回落到配置的 FunderAddress。
+// 翻页与 GetOpenOrders 一致：onlyFirstPage 为 false 时跟随 pagination.next_cursor 取完所有页。
+// nextCursor 兼作入参和出参：传 nil 表示从第一页开始，非 nil 时下一页游标会写回其中，
+// 空串表示已到末页。
+func (c *PolymarketClient) SearchPositions(params *PositionParams, onlyFirstPage bool, nextCursor *string) ([]Position, error) {
+	if params == nil {
+		params = &PositionParams{}
 	}
-	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.DataAPIBaseURL, "/positions")
-	params := map[string]string{
-		"sizeThreshold": "0",
-		"limit":         strconv.Itoa(limit),
-		"sortBy":        "TOKENS",
-		"sortDirection": "DESC",
-		"user":          wallet,
+	user := params.User
+	if user == "" {
+		user = c.cfg.Polymarket.FunderAddress
 	}
-	if redeemable {
-		params["redeemable"] = "true"
+	if user == "" && params.Condition == "" {
+		return nil, fmt.Errorf("user or condition is required")
 	}
-	result, err := c.Get(url, params, nil)
-	if err != nil {
-		return nil, err
+	url := fmt.Sprintf("%s%s", c.cfg.Polymarket.DataAPIBaseURL, "/v2/positions")
+
+	var cursor string
+	if nextCursor != nil {
+		cursor = *nextCursor
 	}
-	return result, nil
+
+	var positions []Position
+	for {
+		// 锚点参数每页都要带：v2 要求 user/condition 至少有一个，续页只靠 cursor 会被 400 拒掉
+		pms := map[string]string{}
+		if user != "" {
+			pms["user"] = user
+		}
+		if params.Condition != "" {
+			pms["condition"] = params.Condition
+		}
+		if cursor != "" {
+			// 续页只带锚点 + cursor：分页位置、页大小与过滤条件都已固化在游标里，
+			// 重复传过滤条件会与服务端冲突（实测传不同的 status 会返回空集）
+			pms["cursor"] = cursor
+		} else {
+			if params.Status != "" {
+				pms["status"] = string(params.Status)
+			}
+			if params.EventId != "" {
+				pms["event_id"] = params.EventId
+			}
+			if params.Title != "" {
+				pms["title"] = params.Title
+			}
+			if params.FilterType != "" {
+				pms["filter_type"] = string(params.FilterType)
+			}
+			if params.FilterAmount != nil {
+				pms["filter_amount"] = strconv.FormatFloat(*params.FilterAmount, 'f', -1, 64)
+			}
+			if params.SortBy != "" {
+				pms["sort_by"] = params.SortBy
+			}
+			if params.SortDirection != "" {
+				pms["sort_direction"] = params.SortDirection
+			}
+			if params.Limit > 0 {
+				pms["limit"] = strconv.Itoa(params.Limit)
+			}
+		}
+
+		result, err := c.Get(url, pms, nil)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range result.Get("data").Array() {
+			var position Position
+			if err := json.Unmarshal([]byte(item.Raw), &position); err != nil {
+				return nil, fmt.Errorf("decode position %s: %w", item.Raw, err)
+			}
+			positions = append(positions, position)
+		}
+
+		next := result.Get("pagination.next_cursor")
+		if next.Type != gjson.String || next.String() == "" {
+			cursor = ""
+			break
+		}
+		cursor = next.String()
+		if onlyFirstPage {
+			break
+		}
+	}
+	if nextCursor != nil {
+		*nextCursor = cursor
+	}
+	return positions, nil
 }
 
 func (c *PolymarketClient) SetTickSize(tokenID string, tickSize float64) error {
